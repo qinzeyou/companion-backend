@@ -10,6 +10,7 @@ import com.caiya.companion.model.request.UserLoginRequest;
 import com.caiya.companion.model.request.UserRegisterRequest;
 import com.caiya.companion.service.UserService;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -74,6 +75,19 @@ public class UserController {
         }
         // 返回脱敏的用户数组
         List<User> userList = userService.list(queryWrapper).stream().map(user -> userService.getSafetyUser(user)).collect(Collectors.toList());
+        return ResultUtils.success(userList);
+    }
+
+    /**
+     * 根据标签搜索用户
+     *
+     * @param tagNameList 标签列表
+     * @return
+     */
+    @GetMapping("/search/tags")
+    public BaseResponse<List<User>> searchUserByTags(@RequestParam(required = false) List<String> tagNameList) {
+        if (CollectionUtils.isEmpty(tagNameList)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        List<User> userList = userService.searchUserByTags(tagNameList);
         return ResultUtils.success(userList);
     }
 

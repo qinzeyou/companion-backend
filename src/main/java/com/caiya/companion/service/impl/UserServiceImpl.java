@@ -125,6 +125,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         safetyUser.setUserStatus(originUser.getUserStatus());
         safetyUser.setCreateTime(originUser.getCreateTime());
         safetyUser.setTags(originUser.getTags());
+        safetyUser.setProfile(originUser.getProfile());
         return safetyUser;
     }
 
@@ -164,10 +165,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             Set<String> tmpTagNameListSet = gson.fromJson(tagsStr, new TypeToken<Set<String>>() {
             }.getType());
             // 因为有的用户的标签列表可能为空，这会导致在用用户的标签列表去判断前端传入的标签列表中的标签时会报错空指针，如果需要给用户的标签列表进行一个非空设置
-            /**
-             * 这段代码会先创建一个Optional对象，如果tmpTagNameListSet不为空，则包含tmpTagNameListSet，反之则包含null
-             * 如果Optional包含的是null，则会走orElse为Optional设置一个默认值，然后返回新的Set<String>实例
-             */
+            // 这段代码会先创建一个Optional对象，如果tmpTagNameListSet不为空，则包含tmpTagNameListSet，反之则包含null
+            // 如果Optional包含的是null，则会走orElse为Optional设置一个默认值，然后返回新的Set<String>实例
             tmpTagNameListSet = Optional.ofNullable(tmpTagNameListSet).orElse(new HashSet<>());
             // 遍历要查询的标签列表，然后判断该用户的标签列表是否包含该标签，如果不包含，直接返回false，也就不匹配该用户
             for (String tagName : tagNameList) {
