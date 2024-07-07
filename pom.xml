@@ -48,8 +48,6 @@
             <artifactId>knife4j-spring-boot-starter</artifactId>
             <version>2.0.7</version>
         </dependency>
-
-
         <!-- Mysql -->
         <dependency>
             <groupId>com.mysql</groupId>

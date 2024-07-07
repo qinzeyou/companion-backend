@@ -2,6 +2,7 @@ package com.caiya.companion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.caiya.companion.common.ResultUtils;
 import com.caiya.companion.constant.UserConstant;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.common.ErrorCode;
@@ -22,6 +23,9 @@ import java.nio.file.OpenOption;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static com.caiya.companion.constant.UserConstant.ADMIN_ROLE;
+import static com.caiya.companion.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * @author Administrator
@@ -175,6 +179,74 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             return true;
         }).map(this::getSafetyUser).collect(Collectors.toList());
         return userList;
+    }
+
+    /**
+     * 判断是否为管理员
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public boolean isAdmin(HttpServletRequest request) {
+        // 从session中获取用户信息
+        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        // 判断用户是否为空
+        if (user == null) throw new BusinessException(ErrorCode.NO_AUTH);
+        return user.getUserRole() == ADMIN_ROLE;
+    }
+
+    /**
+     * 判断是否为管理员
+     *
+     * @param loginUser
+     * @return
+     */
+    @Override
+    public boolean isAdmin(User loginUser) {
+        // 判断用户是否为空
+        if (loginUser == null) throw new BusinessException(ErrorCode.NO_AUTH);
+        return loginUser.getUserRole() == ADMIN_ROLE;
+    }
+
+    /**
+     * 修改用户数据，只有管理员 或 用户只能修改自己的信息
+     *
+     * @param user 待修改的用户信息
+     * @param request
+     * @return 受影响行数
+     */
+    @Override
+    public int updateUser(User user, HttpServletRequest request) {
+        // 判断用户id是否正确
+        if (user.getId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        // 获取当前登录用户信息
+        User loginUser = getLoginUser(request);
+        // 根据id查询出要修改的用户信息
+        User oldUser = userMapper.selectById(user.getId());
+        // 1. 判断当前登录用户是否为管理员 and 用户修改是否是自己的信息
+        if (!isAdmin(loginUser) || !Objects.equals(oldUser.getId(), loginUser.getId())) throw new BusinessException(ErrorCode.NO_AUTH);
+
+        // 2. 触发修改
+        return userMapper.updateById(user);
+    }
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public User getLoginUser(HttpServletRequest request) {
+        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (currentUser == null) throw new BusinessException(ErrorCode.NULL_ERROR);
+        long userId = currentUser.getId();
+        User dbUser = userMapper.selectById(userId);
+        return getSafetyUser(dbUser);
     }
 
     /**

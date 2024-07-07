@@ -2,6 +2,9 @@ server:
   port: 8080
   servlet:
     context-path: /api # 添加全局接口前缀
+    session:
+      cookie:
+        domain: localhost
 
 spring:
   profiles:
@@ -11,9 +14,16 @@ spring:
   # Mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/companion?serverTimezone=GMT%2b8
+    url: jdbc:mysql://localhost:3306/companion?serverTimezone=GMT%2b8&rewriteBatchedStatements=true
     username: root
     password: 123456
+    # 连接池
+    hikari:
+      minimum-idle: 5 # 最小空闲连接数
+      maximum-pool-size: 10 # 最大活跃连接数
+      connection-timeout: 30000 # 连接超时时间（毫秒）
+      idle-timeout: 600000 # 空闲连接最大存活时间
+      auto-commit: true # 此属性控制从池返回的连接的默认自动提交行为
   # redis
   redis:
     port: 6379
