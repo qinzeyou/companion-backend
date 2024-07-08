@@ -36,8 +36,6 @@ public class UserController {
 
     @Resource
     private UserService userService;
-    @Resource
-    private RedisTemplate<String, Object> redisTemplate;
 
     /**
      * 注册接口
@@ -124,26 +122,7 @@ public class UserController {
      */
     @GetMapping("/recommend")
     public BaseResponse<Page<User>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
-        // 获取当前登录用户
-        User loginUser = userService.getLoginUser(request);
-        String redisKey = String.format("companion:user:recommend:%s", loginUser.getId());
-        // 去读Redis缓存
-        ValueOperations<String, Object> opsForValue = redisTemplate.opsForValue();
-        Page<User> userPage = (Page<User>) opsForValue.get(redisKey);
-        // 如果redis中是有缓存，则直接读取缓存并返回
-        if (userPage != null) {
-            return ResultUtils.success(userPage);
-        }
-        // 如果没有缓存，则直接查询数据库，将结果存储到redis中，且返回结果
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        Page<User> page = new Page<>(pageNum, pageSize);
-        userPage = userService.page(page, queryWrapper);
-        // 存入redis
-        try {
-            opsForValue.set(redisKey, userPage, 30000, TimeUnit.MILLISECONDS);
-        } catch (Exception e) {
-            log.error("set redis key error：", e);
-        }
+        Page<User> userPage = userService.recommendUsers(pageNum, pageSize, request);
         return ResultUtils.success(userPage);
     }
 

@@ -1,6 +1,7 @@
 package com.caiya.companion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.caiya.companion.common.ResultUtils;
 import com.caiya.companion.constant.UserConstant;
@@ -13,6 +14,8 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.DigestUtils;
@@ -21,6 +24,7 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.nio.file.OpenOption;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -39,6 +43,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private UserMapper userMapper;
+
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
 
     /**
      * 盐值
@@ -247,6 +254,45 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         long userId = currentUser.getId();
         User dbUser = userMapper.selectById(userId);
         return getSafetyUser(dbUser);
+    }
+
+    /**
+     * 推荐用户分页
+     *
+     * @param pageNum 当前页
+     * @param pageSize 一页多少条
+     * @param request
+     * @return
+     */
+    @Override
+    public Page<User> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
+        User loginUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        String redisKey = "companion:user:recommend:%s";
+        // 判断用户是否登录，如果登录则根据登录用户id来存取缓存
+        if (loginUser != null) {
+            redisKey = String.format(redisKey, loginUser.getId());
+        } else {
+            // 不登录则默认存取公共缓存
+            redisKey = String.format(redisKey, 0);
+        }
+        // 去读Redis缓存
+        ValueOperations<String, Object> opsForValue = redisTemplate.opsForValue();
+        Page<User> userPage = (Page<User>) opsForValue.get(redisKey);
+        // 如果redis中是有缓存，则直接读取缓存并返回
+        if (userPage != null) {
+            return userPage;
+        }
+        // 如果没有缓存，则直接查询数据库，将结果存储到redis中，且返回结果
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        Page<User> page = new Page<>(pageNum, pageSize);
+        userPage = this.page(page, queryWrapper);
+        // 存入redis
+        try {
+            opsForValue.set(redisKey, userPage, 30000, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            log.error("set redis key error：", e);
+        }
+        return userPage;
     }
 
     /**

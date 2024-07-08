@@ -14,7 +14,7 @@ spring:
   # Mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/companion?serverTimezone=GMT%2b8&rewriteBatchedStatements=true
+    url: jdbc:mysql://localhost:3306/companion?serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
     username: root
     password: 123456
     # 连接池
@@ -27,6 +27,7 @@ spring:
   # redis
   redis:
     port: 6379
+    host: 127.0.0.1
     database: 0
   # session 配置
   session:

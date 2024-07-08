@@ -1,5 +1,6 @@
 package com.caiya.companion.service;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.caiya.companion.common.BaseResponse;
 import com.caiya.companion.model.domain.User;
@@ -89,4 +90,14 @@ public interface UserService extends IService<User> {
      * @return
      */
     User getLoginUser(HttpServletRequest request);
+
+    /**
+     * 推荐用户分页
+     *
+     * @param pageNum 当前页
+     * @param pageSize 一页多少条
+     * @param request
+     * @return
+     */
+    Page<User> recommendUsers(long pageNum, long pageSize, HttpServletRequest request);
 }
