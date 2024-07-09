@@ -1,8 +1,10 @@
 package com.caiya.companion.model.qo;
 
 import com.caiya.companion.common.PageRequest;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
 
@@ -14,6 +16,17 @@ import java.util.Date;
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class TeamListQO extends PageRequest {
+
+    /**
+     * 主键
+     */
+    private Long id;
+
+    /**
+     * 搜索关键字
+     */
+    private String searchText;
+
     /**
      * 队伍名称
      */
@@ -32,6 +45,8 @@ public class TeamListQO extends PageRequest {
     /**
      * 过期时间
      */
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date expireTime;
 
     /**

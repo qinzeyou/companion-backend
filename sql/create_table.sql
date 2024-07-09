@@ -28,7 +28,7 @@ create table team
     description   varchar(1024)                null comment '描述',
     maxNum  int      default 1                 not null comment '最大人数',
     expireTime  datetime  										 null comment '过期时间',
-    userId    bigint(11) 										   null comment '创建人id',
+    userId    bigint(11) 										   null comment '创建人id（队长id）',
     status  int      default 0                 not null comment '队伍状态：0 - 公开，1 - 私有，2 - 加密',
     password    varchar(512)                       not null comment '密码',
     createTime  datetime default CURRENT_TIMESTAMP null comment '创建时间',

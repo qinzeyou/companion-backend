@@ -59,7 +59,7 @@ public class PreCacheJob {
                     Page<User> page = new Page<>(1, 10);
                     Page<User> userPage = userService.page(page, queryWrapper);
                     // 写缓存
-                    opsForValue.set(redisKey, userPage, 30000, TimeUnit.MILLISECONDS);
+                    opsForValue.set(redisKey, userPage, 1, TimeUnit.DAYS);
                 }
 
             }

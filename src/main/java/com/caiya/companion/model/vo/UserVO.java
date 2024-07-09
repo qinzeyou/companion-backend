@@ -1,22 +1,21 @@
-package com.caiya.companion.model.domain;
+package com.caiya.companion.model.vo;
 
-import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
-import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 用户
- * @TableName user
+ * @author caiya
+ * @description 用户包装类（脱敏）
+ * @create 2024-07-09 08:13
  */
-@TableName(value ="user")
 @Data
-public class User implements Serializable {
+public class UserVO {
+
+
     /**
      * 主键
      */
-    @TableId(type = IdType.AUTO)
     private Long id;
 
     /**
@@ -28,11 +27,6 @@ public class User implements Serializable {
      * 账号
      */
     private String userAccount;
-
-    /**
-     * 密码
-     */
-    private String password;
 
     /**
      * 电话
@@ -59,7 +53,6 @@ public class User implements Serializable {
      */
     private String profile;
 
-
     /**
      * 状态 0-正常
      */
@@ -70,29 +63,13 @@ public class User implements Serializable {
      */
     private Date createTime;
 
-
-    /**
-     * 更新时间
-     */
-    @TableField(fill = FieldFill.UPDATE)
-    private Date updateTime;
-
-    /**
-     * 是否删除
-     */
-    @TableLogic
-    private Integer isDelete;
-
     /**
      * 标签 json 列表
      */
     private String tags;
 
     /**
-     * 用户角色 0 普通用户 1 管理员
+     * 更新时间
      */
-    private Integer userRole;
-
-    @TableField(exist = false)
-    private static final long serialVersionUID = 1L;
+    private Date updateTime;
 }

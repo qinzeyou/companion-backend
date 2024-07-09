@@ -1,24 +1,17 @@
-package com.caiya.companion.model.dto;
-
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
+package com.caiya.companion.model.request;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
 
 /**
  * @author caiya
- * @description 更新队伍请求体
- * @create 2024-07-08 21:47
+ * @description 创建队伍请求体
+ * @create 2024-07-08 21:31
  */
 @Data
-public class TeamUpdateRequest {
-
-    /**
-     * 主键
-     */
-    private Long id;
-
+public class TeamAddRequest {
     /**
      * 队伍名称
      */
@@ -37,6 +30,8 @@ public class TeamUpdateRequest {
     /**
      * 过期时间
      */
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date expireTime;
 
     /**

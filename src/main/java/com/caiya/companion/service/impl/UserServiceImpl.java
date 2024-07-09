@@ -288,7 +288,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         userPage = this.page(page, queryWrapper);
         // 存入redis
         try {
-            opsForValue.set(redisKey, userPage, 30000, TimeUnit.MILLISECONDS);
+            opsForValue.set(redisKey, userPage, 1, TimeUnit.DAYS);
         } catch (Exception e) {
             log.error("set redis key error：", e);
         }

@@ -1,4 +1,5 @@
-package com.caiya.companion.model.dto;
+package com.caiya.companion.model.vo;
+
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -7,11 +8,17 @@ import java.util.Date;
 
 /**
  * @author caiya
- * @description 创建队伍请求体
- * @create 2024-07-08 21:31
+ * @description 队伍列表返回包装类
+ * @create 2024-07-09 08:11
  */
 @Data
-public class TeamAddRequest {
+public class TeamUserVO {
+
+    /**
+     * 主键
+     */
+    private Long id;
+
     /**
      * 队伍名称
      */
@@ -44,8 +51,9 @@ public class TeamAddRequest {
      */
     private Integer status;
 
+
     /**
-     * 密码
+     * 创建人信息
      */
-    private String password;
+    private UserVO createUser;
 }

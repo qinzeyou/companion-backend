@@ -47,6 +47,7 @@ public class Tag implements Serializable {
     /**
      * 更新时间
      */
+    @TableField(fill = FieldFill.UPDATE)
     private Date updateTime;
 
     /**

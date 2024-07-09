@@ -32,8 +32,9 @@ public class UserTeam implements Serializable {
     private Long teamId;
 
     /**
-     * 过期时间
+     * 加入时间
      */
+    @TableField(fill = FieldFill.INSERT)
     private Date joinTime;
 
     /**
@@ -44,8 +45,7 @@ public class UserTeam implements Serializable {
     /**
      * 更新时间
      */
-    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    @TableField(fill = FieldFill.UPDATE)
     private Date updateTime;
 
     /**
