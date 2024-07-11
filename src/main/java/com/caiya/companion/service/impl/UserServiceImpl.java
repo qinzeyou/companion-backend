@@ -10,8 +10,10 @@ import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.mapper.UserMapper;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.service.UserService;
+import com.caiya.companion.utils.AlgorithmUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -219,7 +221,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     /**
      * 修改用户数据，只有管理员 或 用户只能修改自己的信息
      *
-     * @param user 待修改的用户信息
+     * @param user    待修改的用户信息
      * @param request
      * @return 受影响行数
      */
@@ -235,7 +237,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 根据id查询出要修改的用户信息
         User oldUser = userMapper.selectById(user.getId());
         // 1. 判断当前登录用户是否为管理员 and 用户修改是否是自己的信息
-        if (!isAdmin(loginUser) || !Objects.equals(oldUser.getId(), loginUser.getId())) throw new BusinessException(ErrorCode.NO_AUTH);
+        if (!isAdmin(loginUser) || !Objects.equals(oldUser.getId(), loginUser.getId()))
+            throw new BusinessException(ErrorCode.NO_AUTH);
 
         // 2. 触发修改
         return userMapper.updateById(user);
@@ -259,7 +262,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     /**
      * 推荐用户分页
      *
-     * @param pageNum 当前页
+     * @param pageNum  当前页
      * @param pageSize 一页多少条
      * @param request
      * @return
@@ -293,6 +296,78 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             log.error("set redis key error：", e);
         }
         return userPage;
+    }
+
+    /**
+     * 推荐匹配用户列表
+     *
+     * @param num
+     * @param request
+     * @return
+     */
+    @Override
+    public List<User> matchUsers(Integer num, HttpServletRequest request) {
+        // 获取所有用户信息
+        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+        userQueryWrapper.isNotNull("tags");
+        // 原始用户数据列表
+        List<User> originUserList = this.list(userQueryWrapper);
+        // 获取登录用户信息作为推荐
+        User loginUser = getLoginUser(request);
+        // 1. 如果用户未登录，则随机取出用户
+        if (loginUser == null) {
+            return getRandomElements(originUserList, num);
+        }
+
+        // 2. 如果用户已登录，则根据编辑距离算法进行推荐
+        // 获取登录用户的标签
+        String loginUserTags = loginUser.getTags();
+        Gson gson = new Gson();
+        // 将获取到标签转为java数组对象，因为从登录用户取出的是字符串类型的，需要转一下，方便后面操作
+        List<String> loginUserTagList = gson.fromJson(loginUserTags, new TypeToken<List<String>>() {
+        }.getType());
+        // 用户列表的下标 => 相似度
+        List<Pair<User, Long>> indexUserDistanceList = new ArrayList<>();
+        // 依次计算所有用户和当前用户的相似度
+        for (int i = 0; i < originUserList.size(); i++) {
+            User user = originUserList.get(i);
+            String userTags = user.getTags();
+            List<String> userTagsList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+            }.getType());
+            // 标签为空 || 剔除自己
+            if (CollectionUtils.isEmpty(userTagsList) || Objects.equals(user.getId(), loginUser.getId())) continue;
+            // 计算分数
+            long distance = AlgorithmUtils.minDistance(loginUserTagList, userTagsList);
+            indexUserDistanceList.add(new Pair<>(user, distance));
+        }
+        // 根据编辑距离排序，距离越小，用户相似度越高
+        List<Pair<User, Long>> topUserPairList = indexUserDistanceList.stream()
+                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
+                .limit(num)
+                .collect(Collectors.toList());
+        // 取出key：用户
+        List<User> result = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
+        return result;
+    }
+
+    /**
+     * 随机取出指定条数的用户数据
+     *
+     * @param list
+     * @param num
+     * @return
+     */
+    public static List<User> getRandomElements(List<User> list, int num) {
+        Random rand = new Random();
+        List<User> result = new ArrayList<>();
+
+        while (result.size() < num) {
+            int index = rand.nextInt(list.size());
+            if (!result.contains(list.get(index))) { // 防止重复（如果需要的话）
+                result.add(list.get(index));
+            }
+        }
+        return result;
     }
 
     /**

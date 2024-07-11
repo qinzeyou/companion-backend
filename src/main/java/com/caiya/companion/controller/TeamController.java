@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -71,6 +72,37 @@ public class TeamController {
         return ResultUtils.success(teamUserVOList);
     }
 
+    /**
+     * 获取指定用户创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    @GetMapping("/list/user/create")
+    public BaseResponse<List<TeamUserVO>> listCreateTeamByUser(@RequestParam Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        List<TeamUserVO> teamUserVOList = teamService.listCreateTeamByUser(userId);
+        return ResultUtils.success(teamUserVOList);
+    }
+
+    /**
+     * 获取指定用户加入或创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    @GetMapping("/list/user/manager/{userId}")
+    public BaseResponse<Map<String, List<TeamUserVO>>> listTeamByUser(@PathVariable Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        Map<String, List<TeamUserVO>> result = teamService.listTeamByUser(userId);
+        return ResultUtils.success(result);
+    }
+
+    // todo 实现分页
     @PostMapping("/list/page")
     public BaseResponse<Page<Team>> listTeamByPage(@RequestBody TeamListQO teamListQO) {
         if (teamListQO == null) {
@@ -104,8 +136,8 @@ public class TeamController {
         return ResultUtils.success(result);
     }
 
-    @DeleteMapping("/delete")
-    public BaseResponse<Boolean> deleteTeam(Long teamId, HttpServletRequest request) {
+    @DeleteMapping("/delete/{teamId}")
+    public BaseResponse<Boolean> deleteTeam(@PathVariable Long teamId, HttpServletRequest request) {
         if (teamId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }

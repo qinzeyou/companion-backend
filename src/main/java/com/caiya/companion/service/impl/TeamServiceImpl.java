@@ -21,15 +21,14 @@ import com.caiya.companion.service.UserService;
 import com.caiya.companion.service.UserTeamService;
 import com.github.xiaoymin.knife4j.core.util.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * @author Administrator
@@ -398,6 +397,111 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         }
         // 删除队伍
         return this.removeById(teamId);
+    }
+
+    /**
+     * 获取指定用户创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    @Override
+    public List<TeamUserVO> listCreateTeamByUser(Long userId) {
+        // 获取用户的信息
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在");
+        }
+        // 获取用户创建的队伍列表
+        QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userId", userId);
+        List<Team> teamList = this.list(queryWrapper);
+
+        // 信息脱敏
+        List<TeamUserVO> teamUserVOList = new ArrayList<>();
+        for (Team team : teamList) {
+            // 队伍信息脱敏
+            TeamUserVO teamUserVO = new TeamUserVO();
+            BeanUtils.copyProperties(team, teamUserVO);
+
+            // 用户信息脱敏
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            teamUserVO.setCreateUser(userVO);
+            teamUserVOList.add(teamUserVO);
+        }
+        return teamUserVOList;
+    }
+
+    /**
+     * 获取指定用户加入或创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    @Override
+    public Map<String, List<TeamUserVO>> listTeamByUser(Long userId) {
+        // 获取用户的信息
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在");
+        }
+        // 1. 获取用户创建的队伍列表
+        QueryWrapper<Team> teamQueryWrapper = new QueryWrapper<>();
+        teamQueryWrapper.eq("userId", userId);
+        List<Team> teamList = this.list(teamQueryWrapper);
+
+        // 返回结果：map键值对
+        Map<String, List<TeamUserVO>> map = new HashMap<>();
+
+        // 信息脱敏
+        List<TeamUserVO> createTemaUserVOList = getTeamUserVOS(user, teamList);
+        map.put("createTeamList", createTemaUserVOList);
+
+        // 2. 获取用户加入的队伍
+        // 查询条件
+        QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+        // 如果用户创建队伍不为0，才去重
+        if (CollectionUtils.isNotEmpty(teamList)) {
+            // 取出用户创建队伍的所有队伍id
+            List<Long> createTeamIds = teamList.stream().map(Team::getId).collect(Collectors.toList());
+            // 查询条件：userId为指定用户 且 teamId不在创建的队伍id数组中
+            userTeamQueryWrapper.eq("userId", userId).notIn("teamId", createTeamIds);
+        } else {
+            // 以用户id作为查询条件
+            userTeamQueryWrapper.eq("userId", userId);
+        }
+        List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+        // 获取用户队伍关系中用户加入队伍的id
+        List<Long> joinTeamIds = userTeamList.stream().map(UserTeam::getTeamId).collect(Collectors.toList());
+        List<TeamUserVO> joinTeamUserVOList = new ArrayList<>();
+        // 如果加入队伍不为0，才根据已加入的队伍id去查询队伍信息
+        if (CollectionUtils.isNotEmpty(joinTeamIds)) {
+            teamQueryWrapper = new QueryWrapper<>();
+            teamQueryWrapper.in("id", joinTeamIds);
+            List<Team> joinTeamList = this.list(teamQueryWrapper);
+            // 信息脱敏
+            joinTeamUserVOList = getTeamUserVOS(user, joinTeamList);
+        }
+        map.put("joinTeamList", joinTeamUserVOList);
+        return map;
+    }
+
+    @NotNull
+    private static List<TeamUserVO> getTeamUserVOS(User user, List<Team> teamList) {
+        List<TeamUserVO> createTemaUserVOList = new ArrayList<>();
+        for (Team team : teamList) {
+            // 队伍信息脱敏
+            TeamUserVO teamUserVO = new TeamUserVO();
+            BeanUtils.copyProperties(team, teamUserVO);
+
+            // 用户信息脱敏
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            teamUserVO.setCreateUser(userVO);
+            createTemaUserVOList.add(teamUserVO);
+        }
+        return createTemaUserVOList;
     }
 
     /**

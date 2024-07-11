@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author caiya
@@ -21,6 +22,11 @@ public class TeamListQO extends PageRequest {
      * 主键
      */
     private Long id;
+
+    /**
+     * 用户已加入的队伍id数组，作为查询指定用户加入队伍的字段
+     */
+    private List<Long> idList;
 
     /**
      * 搜索关键字

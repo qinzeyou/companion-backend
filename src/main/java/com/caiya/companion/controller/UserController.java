@@ -120,9 +120,26 @@ public class UserController {
      * @param pageSize
      * @return
      */
+    // todo 未实现推荐
     @GetMapping("/recommend")
     public BaseResponse<Page<User>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
         Page<User> userPage = userService.recommendUsers(pageNum, pageSize, request);
+        return ResultUtils.success(userPage);
+    }
+
+    /**
+     * 推荐匹配用户列表
+     *
+     * @param num
+     * @param request
+     * @return
+     */
+    @GetMapping("/match/{num}")
+    public BaseResponse<List<User>> matchUsers(@PathVariable Integer num, HttpServletRequest request) {
+        if (num <= 0) {
+            num = 10;
+        }
+        List<User> userPage = userService.matchUsers(num, request);
         return ResultUtils.success(userPage);
     }
 

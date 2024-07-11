@@ -4,7 +4,9 @@ server:
     context-path: /api # 添加全局接口前缀
     session:
       cookie:
-        domain: localhost
+        domain:
+          - localhost
+          - 127.0.0.1
 
 spring:
   profiles:
@@ -41,7 +43,7 @@ spring:
 mybatis-plus:
   configuration:
     mapUnderscoreToCamelCase: false # 是否开启自动驼峰命名规则，默认为true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印sql日志
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 打印sql日志
   global-config:
     db-config:
       logic-delete-field: isDelete # 全局逻辑删除的实体字段名(since 3.3.0,配置后可以忽略不配置步骤2)

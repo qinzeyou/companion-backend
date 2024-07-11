@@ -11,6 +11,7 @@ import com.caiya.companion.model.qo.TeamListQO;
 import com.caiya.companion.model.vo.TeamUserVO;
 
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -71,4 +72,20 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     boolean deleteTeam(Long teamId, User loginUser);
+
+    /**
+     * 获取指定用户创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    List<TeamUserVO> listCreateTeamByUser(Long userId);
+
+    /**
+     * 获取指定用户加入或创建的队伍
+     *
+     * @param userId
+     * @return
+     */
+    Map<String, List<TeamUserVO>> listTeamByUser(Long userId);
 }
