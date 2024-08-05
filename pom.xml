@@ -48,6 +48,12 @@
             <artifactId>knife4j-spring-boot-starter</artifactId>
             <version>2.0.7</version>
         </dependency>
+        <!--    七牛云依赖    -->
+        <dependency>
+            <groupId>com.qiniu</groupId>
+            <artifactId>qiniu-java-sdk</artifactId>
+            <version>[7.7.0, 7.7.99]</version>
+        </dependency>
         <!-- Mysql -->
         <dependency>
             <groupId>com.mysql</groupId>

@@ -236,12 +236,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User loginUser = getLoginUser(request);
         // 根据id查询出要修改的用户信息
         User oldUser = userMapper.selectById(user.getId());
-        // 1. 判断当前登录用户是否为管理员 and 用户修改是否是自己的信息
-        if (!isAdmin(loginUser) || !Objects.equals(oldUser.getId(), loginUser.getId()))
-            throw new BusinessException(ErrorCode.NO_AUTH);
-
-        // 2. 触发修改
-        return userMapper.updateById(user);
+        // 1. 判断当前登录用户是否为管理员 || 用户修改是否是自己的信息
+        if (isAdmin(loginUser) || loginUser.getId().equals(oldUser.getId()))
+            // 2. 触发修改
+            return userMapper.updateById(user);
+        // 以上都不符合则报错
+        throw new BusinessException(ErrorCode.NO_AUTH);
     }
 
     /**
@@ -348,6 +348,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 取出key：用户
         List<User> result = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
         return result;
+    }
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @param request
+     * @return
+     */
+    @Override
+    public User getCurrentUser(HttpServletRequest request) {
+        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        if (currentUser == null) return null;
+        long userId = currentUser.getId();
+        User dbUser = userMapper.selectById(userId);
+        return getSafetyUser(dbUser);
     }
 
     /**

@@ -53,4 +53,9 @@ public class TeamUpdateRequest {
      * 密码
      */
     private String password;
+
+    /**
+     * 队伍封面
+     */
+    private String teamCover;
 }

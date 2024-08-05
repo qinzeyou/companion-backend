@@ -1,8 +1,11 @@
 package com.caiya.companion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.caiya.companion.common.ErrorCode;
+import com.caiya.companion.common.PageRequest;
+import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.TeamMapper;
 import com.caiya.companion.model.domain.Team;
@@ -20,6 +23,7 @@ import com.caiya.companion.service.TeamService;
 import com.caiya.companion.service.UserService;
 import com.caiya.companion.service.UserTeamService;
 import com.github.xiaoymin.knife4j.core.util.CollectionUtils;
+import io.swagger.models.auth.In;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.BeanUtils;
@@ -27,8 +31,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.caiya.companion.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * @author Administrator
@@ -125,11 +132,13 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
      * 条件查询队伍列表
      *
      * @param teamListQO
+     * @param request
      * @return
      */
     @Override
-    public List<TeamUserVO> listTeam(TeamListQO teamListQO, boolean isAdmin) {
+    public List<TeamUserVO> listTeam(TeamListQO teamListQO, HttpServletRequest request) {
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
+        User loginUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
         // 组合查询条件
         if (teamListQO != null) {
             // 根据队伍id查询
@@ -162,23 +171,37 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (userId != null && userId > 0) {
                 queryWrapper.eq("userId", userId);
             }
-            // 根据队伍状态查询，只有管理员才能查看加密还有非公开的队伍
-            Integer status = teamListQO.getStatus();
+            // 根据队伍状态查询，只有管理员才能查看非公开的队伍
+            Integer status = Optional.ofNullable(teamListQO.getStatus()).orElse(TeamStatusEnum.PUBLIC.getValue());
             TeamStatusEnum teamStatusEnum = TeamStatusEnum.getEnumByValue(status);
-            if (teamStatusEnum == null) {
-                teamStatusEnum = TeamStatusEnum.PUBLIC;
-            }
             // 如果不是管理员 且 查询队伍的状态为非公开 则报错
-            if (!isAdmin && !teamStatusEnum.equals(TeamStatusEnum.PUBLIC)) {
+            if (!userService.isAdmin(loginUser) && teamStatusEnum.equals(TeamStatusEnum.PRIVATE)) {
                 throw new BusinessException(ErrorCode.NO_AUTH);
             }
-            queryWrapper.eq("status", teamStatusEnum.getValue());
+            if (teamStatusEnum == null) {
+                queryWrapper.and(qw -> qw.eq("status", TeamStatusEnum.PUBLIC.getValue()).or().eq("status", TeamStatusEnum.SECRET.getValue()));
+            } else {
+                queryWrapper.eq("status", teamStatusEnum.getValue());
+            }
         }
         // 不展示已过期的队伍
         queryWrapper.and(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
         List<Team> teamList = this.list(queryWrapper);
         if (CollectionUtils.isEmpty(teamList)) {
             return new ArrayList<>();
+        }
+        List<Long> userTeamIdList = new ArrayList<>();
+        if (loginUser != null) {
+            // 获取当前登录用户加入的队伍
+            QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+            userTeamQueryWrapper.eq("userId", loginUser.getId());
+            List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+            // 如果用户加入或创建的队伍不为空，则取出他加入或创建的队伍id
+            if (CollectionUtils.isNotEmpty(userTeamList)) {
+                for (UserTeam userTeam : userTeamList) {
+                    userTeamIdList.add(userTeam.getTeamId());
+                }
+            }
         }
         // 脱敏队伍列表信息
         List<TeamUserVO> teamUserVOList = new ArrayList<>();
@@ -196,6 +219,21 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
                 BeanUtils.copyProperties(safetyUser, userVO);
                 teamUserVO.setCreateUser(userVO);
             }
+            // 设置该用户是否加入队伍的标识
+            teamUserVO.setHasJoin(userTeamIdList.contains(team.getId()));
+            // 获取该队伍加入的用户
+            QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+            userTeamQueryWrapper.eq("teamId", team.getId());
+            List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+            List<Long> joinTeamUserIdList = userTeamList.stream().map(UserTeam::getUserId).collect(Collectors.toList());
+            ArrayList<UserVO> joinUserVOS = new ArrayList<>();
+            for (Long joinUserId : joinTeamUserIdList) {
+                User joinUse = userService.getById(joinUserId);
+                UserVO userVO = new UserVO();
+                BeanUtils.copyProperties(joinUse, userVO);
+                joinUserVOS.add(userVO);
+            }
+            teamUserVO.setJoinUserList(joinUserVOS);
             teamUserVOList.add(teamUserVO);
         }
         return teamUserVOList;
@@ -297,6 +335,9 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户已加入该队伍");
         }
         // 数据操作
+        // 更新队伍加入用户数
+        team.setJoinUserCount(team.getJoinUserCount() + 1);
+        this.updateById(team);
         // 新增用户 - 队伍关系
         UserTeam userTeam = new UserTeam();
         userTeam.setUserId(userId);
@@ -310,6 +351,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     /**
      * 退出队伍
+     *
      * @param teamQuitRequest
      * @param loginUser
      * @return
@@ -368,12 +410,16 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
                 }
             }
         }
+        // 更新队伍加入用户数
+        team.setJoinUserCount(team.getJoinUserCount() - 1);
+        this.updateById(team);
         // 移除 该队伍的 用户 - 队伍 关系
         return userTeamService.remove(userTeamQueryWrapper);
     }
 
     /**
      * 删除（解散）队伍
+     *
      * @param teamId
      * @param loginUser
      * @return
@@ -487,6 +533,63 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         return map;
     }
 
+    /**
+     * 获取分页的队伍数据
+     *
+     * @param pageRequest
+     * @return
+     */
+    @Override
+    public PageResponse<List<TeamUserVO>> recommendTeamList(PageRequest pageRequest, HttpServletRequest request) {
+        // 获取分页队伍数据
+        QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
+        Page<Team> page = new Page<>(pageRequest.getPageNum(), pageRequest.getPageSize());
+        Page<Team> teamPage = page(page, queryWrapper);
+        List<Team> teamList = teamPage.getRecords();
+
+        List<TeamUserVO> teamUserVOList = teamList.stream().map(team -> {
+            // 根据 teamId 获取用户队伍信息关系表中队伍用户关联关系
+            QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
+            userTeamQueryWrapper.eq("teamId", team.getId());
+            List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+            // 获取关联关系中的用户Id
+            List<Long> joinUserIdList = userTeamList.stream().map(UserTeam::getUserId).collect(Collectors.toList());
+            // 获取用户的详细信息，并进行脱敏
+            List<UserVO> userVoList = null;
+            if (!userTeamList.isEmpty()) {
+                QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+                userQueryWrapper.in("id", joinUserIdList);
+                // 用户信息脱敏
+                List<User> userList = userService.list(userQueryWrapper);
+                userVoList = userList.stream().map(user -> {
+                    UserVO userVO = new UserVO();
+                    BeanUtils.copyProperties(user, userVO);
+                    return userVO;
+                }).collect(Collectors.toList());
+            }
+            // 队伍信息脱敏
+            TeamUserVO teamUserVO = new TeamUserVO();
+            BeanUtils.copyProperties(team, teamUserVO);
+            teamUserVO.setJoinUserList(userVoList);
+            return teamUserVO;
+        }).collect(Collectors.toList());
+        // 返回自定义封装分页结果
+        PageResponse<List<TeamUserVO>> pageResponse = new PageResponse<>();
+        pageResponse.setTotal(teamPage.getTotal());
+        pageResponse.setCurrent(teamPage.getCurrent());
+        pageResponse.setSize(teamPage.getSize());
+        pageResponse.setRecords(teamUserVOList);
+
+        return pageResponse;
+    }
+
+    /**
+     * 用户、队伍信息脱敏
+     *
+     * @param user     创建人信息
+     * @param teamList 队伍列表
+     * @return 脱敏队伍列表
+     */
     @NotNull
     private static List<TeamUserVO> getTeamUserVOS(User user, List<Team> teamList) {
         List<TeamUserVO> createTemaUserVOList = new ArrayList<>();

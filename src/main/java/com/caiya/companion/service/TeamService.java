@@ -1,6 +1,8 @@
 package com.caiya.companion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.caiya.companion.common.PageRequest;
+import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.model.domain.Team;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.request.TeamAddRequest;
@@ -10,6 +12,7 @@ import com.caiya.companion.model.request.TeamUpdateRequest;
 import com.caiya.companion.model.qo.TeamListQO;
 import com.caiya.companion.model.vo.TeamUserVO;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.Map;
 
@@ -34,10 +37,10 @@ public interface TeamService extends IService<Team> {
      * 条件查询队伍列表
      *
      * @param teamListQO
-     * @param isAdmin
+     * @param request
      * @return
      */
-    List<TeamUserVO> listTeam(TeamListQO teamListQO, boolean isAdmin);
+    List<TeamUserVO> listTeam(TeamListQO teamListQO, HttpServletRequest request);
 
     /**
      * 修改队伍信息
@@ -88,4 +91,11 @@ public interface TeamService extends IService<Team> {
      * @return
      */
     Map<String, List<TeamUserVO>> listTeamByUser(Long userId);
+
+    /**
+     * 获取分页的队伍数据
+     * @param pageRequest
+     * @return
+     */
+    PageResponse<List<TeamUserVO>> recommendTeamList(PageRequest pageRequest, HttpServletRequest request);
 }

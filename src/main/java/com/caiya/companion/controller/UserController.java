@@ -12,15 +12,12 @@ import com.caiya.companion.model.request.UserRegisterRequest;
 import com.caiya.companion.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 
@@ -74,7 +71,7 @@ public class UserController {
     }
 
     /**
-     * 获取当前用户信息
+     * 获取当前登录用户信息
      *
      * @param request
      * @return
@@ -89,7 +86,7 @@ public class UserController {
 //        return ResultUtils.success(safetyUser);
 
         // 新版
-        User loginUser = userService.getLoginUser(request);
+        User loginUser = userService.getCurrentUser(request);
         return ResultUtils.success(loginUser);
     }
 

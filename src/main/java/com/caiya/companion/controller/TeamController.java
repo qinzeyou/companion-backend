@@ -2,9 +2,7 @@ package com.caiya.companion.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.caiya.companion.common.BaseResponse;
-import com.caiya.companion.common.ErrorCode;
-import com.caiya.companion.common.ResultUtils;
+import com.caiya.companion.common.*;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.Team;
 import com.caiya.companion.model.domain.User;
@@ -67,9 +65,22 @@ public class TeamController {
         if (teamListQO == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        boolean isAdmin = userService.isAdmin(request);
-        List<TeamUserVO> teamUserVOList = teamService.listTeam(teamListQO, isAdmin);
+        List<TeamUserVO> teamUserVOList = teamService.listTeam(teamListQO, request);
         return ResultUtils.success(teamUserVOList);
+    }
+
+    /**
+     * 获取分页的队伍数据
+     * @param pageRequest
+     * @return
+     */
+    @PostMapping("/page/list")
+    public BaseResponse<PageResponse<List<TeamUserVO>>> recommendTeamList(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
+        if (pageRequest == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        PageResponse<List<TeamUserVO>> response = teamService.recommendTeamList(pageRequest, request);
+        return ResultUtils.success(response);
     }
 
     /**

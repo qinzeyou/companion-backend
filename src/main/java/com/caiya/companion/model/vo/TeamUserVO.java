@@ -5,6 +5,7 @@ import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author caiya
@@ -56,4 +57,24 @@ public class TeamUserVO {
      * 创建人信息
      */
     private UserVO createUser;
+
+    /**
+     * 队伍封面
+     */
+    private String teamCover;
+
+    /**
+     * 已加入的用户人数
+     */
+    private Integer joinUserCount;
+
+    /**
+     * 已加入的用户列表
+     */
+    private List<UserVO> joinUserList;
+
+    /**
+     * 标记当前登录用户是否加入该队伍，true为已加入，false反之
+     */
+    private Boolean hasJoin;
 }

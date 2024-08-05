@@ -109,4 +109,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     List<User> matchUsers(Integer num, HttpServletRequest request);
+
+    /**
+     * 获取当前登录用户信息
+     *
+     * @param request
+     * @return
+     */
+    User getCurrentUser(HttpServletRequest request);
 }
