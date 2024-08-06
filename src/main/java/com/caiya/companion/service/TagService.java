@@ -1,21 +1,48 @@
 package com.caiya.companion.service;
 
-import com.caiya.companion.model.domain.Tag;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.request.TagAddRequest;
+import com.caiya.companion.model.request.TagUpdateRequest;
+import com.caiya.companion.model.vo.TagTreeVO;
+
+import java.util.List;
 
 /**
 * @author Administrator
-* @description 针对表【tag】的数据库操作Service
-* @createDate 2024-06-15 19:43:24
+* @description 针对表【tag(标签表)】的数据库操作Service
+* @createDate 2024-08-06 10:20:35
 */
 public interface TagService extends IService<Tag> {
 
     /**
      * 新增标签
-     * @param tagName 标签名称
-     * @param loginUser 当前登录用户
+     * @param tagAddRequest 添加标签请求体
      * @return 新增标签的id
      */
-    Long addTag(String tagName, User loginUser);
+    Long addTag(TagAddRequest tagAddRequest, User loginUser);
+
+    /**
+     * 删除标签
+     * @param tagId 标签id
+     * @param loginUser 登录信息
+     * @return 删除结果：true删除成功，false删除失败
+     */
+    Boolean delTag(long tagId, User loginUser);
+
+    /**
+     * 修改标签
+     * PS：父标签不能改为子标签，因为这样很难处理父标签下的子标签
+     * @param tagUpdateRequest 请求体
+     * @param loginUser 登录信息
+     * @return @return 修改结果：true成功，false失败
+     */
+    Boolean updateTag(TagUpdateRequest tagUpdateRequest, User loginUser);
+
+    /**
+     * 获取树形结构的标签列表
+     * @return 树形标签列表
+     */
+    List<TagTreeVO> treeTag();
 }

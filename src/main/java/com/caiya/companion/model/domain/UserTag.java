@@ -7,12 +7,12 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 标签表
- * @TableName tag
+ * 用户标签关系表
+ * @TableName user_tag
  */
-@TableName(value ="tag")
+@TableName(value ="user_tag")
 @Data
-public class Tag implements Serializable {
+public class UserTag implements Serializable {
     /**
      * 主键
      */
@@ -20,44 +20,19 @@ public class Tag implements Serializable {
     private Long id;
 
     /**
-     * 标签名称
-     */
-    private String tagName;
-
-    /**
-     * 创建者id
+     * 使用者id
      */
     private Long userId;
 
     /**
-     * 父标签id
+     * 标签id
      */
-    private Long parentId;
+    private Long tagId;
 
     /**
-     * 是否父标签，0-不是，1-父标签
+     * 控制标签的显示顺序，数值范围（0 - 10）
      */
-    private Boolean isParent;
-
-    /**
-     * 使用人数
-     */
-    private Integer userNumber;
-
-    /**
-     * 标签状态 0-不可见 1-可见
-     */
-    private Integer status;
-
-    /**
-     * 标签文字颜色
-     */
-    private String textColor;
-
-    /**
-     * 背景颜色
-     */
-    private String color;
+    private Integer index;
 
     /**
      * 创建时间

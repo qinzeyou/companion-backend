@@ -1,24 +1,16 @@
-package com.caiya.companion.model.domain;
+package com.caiya.companion.model.vo;
 
-import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
-import java.io.Serializable;
 import java.util.Date;
 
 /**
- * 标签表
- * @TableName tag
+ * @author caiya
+ * @description 标签脱敏
+ * @create 2024-08-06 12:12
  */
-@TableName(value ="tag")
 @Data
-public class Tag implements Serializable {
-    /**
-     * 主键
-     */
-    @TableId(type = IdType.AUTO)
-    private Long id;
-
+public class TagVO {
     /**
      * 标签名称
      */
@@ -45,11 +37,6 @@ public class Tag implements Serializable {
     private Integer userNumber;
 
     /**
-     * 标签状态 0-不可见 1-可见
-     */
-    private Integer status;
-
-    /**
      * 标签文字颜色
      */
     private String textColor;
@@ -67,15 +54,5 @@ public class Tag implements Serializable {
     /**
      * 更新时间
      */
-    @TableField(fill = FieldFill.UPDATE)
     private Date updateTime;
-
-    /**
-     * 是否删除
-     */
-    @TableLogic
-    private Integer isDelete;
-
-    @TableField(exist = false)
-    private static final long serialVersionUID = 1L;
 }

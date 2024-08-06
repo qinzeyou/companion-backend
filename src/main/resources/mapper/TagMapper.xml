@@ -9,7 +9,10 @@
             <result property="tagName" column="tagName" jdbcType="VARCHAR"/>
             <result property="userId" column="userId" jdbcType="BIGINT"/>
             <result property="parentId" column="parentId" jdbcType="BIGINT"/>
-            <result property="isParent" column="isParent" jdbcType="TINYINT"/>
+            <result property="userNumber" column="userNumber" jdbcType="INTEGER"/>
+            <result property="status" column="status" jdbcType="TINYINT"/>
+            <result property="textColor" column="textColor" jdbcType="VARCHAR"/>
+            <result property="color" column="color" jdbcType="VARCHAR"/>
             <result property="createTime" column="createTime" jdbcType="TIMESTAMP"/>
             <result property="updateTime" column="updateTime" jdbcType="TIMESTAMP"/>
             <result property="isDelete" column="isDelete" jdbcType="TINYINT"/>
@@ -17,7 +20,8 @@
 
     <sql id="Base_Column_List">
         id,tagName,userId,
-        parentId,isParent,createTime,
+        parentId,userNumber,status,
+        textColor,color,createTime,
         updateTime,isDelete
     </sql>
 </mapper>
