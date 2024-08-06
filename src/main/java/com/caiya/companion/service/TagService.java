@@ -1,12 +1,17 @@
 package com.caiya.companion.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.caiya.companion.common.PageRequest;
+import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.request.AddUserTagRequest;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
+import com.caiya.companion.model.vo.TagVO;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -45,4 +50,28 @@ public interface TagService extends IService<Tag> {
      * @return 树形标签列表
      */
     List<TagTreeVO> treeTag();
+
+    /**
+     * 用户添加自身标签
+     * @param addUserTagRequest 请求体
+     * @param loginUser 登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    Boolean addUserTag(AddUserTagRequest addUserTagRequest, User loginUser);
+
+    /**
+     * 用户移除自己的标签（单个移除）
+     * @param tagId 标签id
+     * @param loginUser 登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    Boolean removeUserTag(Long tagId, User loginUser);
+
+    /**
+     * 按照标签使用人数组成热门标签推荐，如果用户登录，则过滤掉用户已有的标签
+     * @param pageRequest 请求体：分页参数
+     * @param request 登录信息
+     * @return 热门标签分页数据
+     */
+    PageResponse<List<TagVO>> hotTagPage(PageRequest pageRequest, HttpServletRequest request);
 }

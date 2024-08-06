@@ -1,13 +1,13 @@
 package com.caiya.companion.controller;
 
-import com.caiya.companion.common.BaseResponse;
-import com.caiya.companion.common.ErrorCode;
-import com.caiya.companion.common.ResultUtils;
+import com.caiya.companion.common.*;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.request.AddUserTagRequest;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
+import com.caiya.companion.model.vo.TagVO;
 import com.caiya.companion.service.TagService;
 import com.caiya.companion.service.UserService;
 import org.springframework.web.bind.annotation.*;
@@ -80,6 +80,46 @@ public class TagController {
     @GetMapping("/tree")
     private BaseResponse<List<TagTreeVO>> treeTag() {
         List<TagTreeVO> res = tagService.treeTag();
+        return ResultUtils.success(res);
+    }
+
+    /**
+     * 用户添加自身标签
+     * @param addUserTagRequest 请求体
+     * @param request 登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    @PostMapping("/add/user/tag")
+    private BaseResponse<Boolean> addUserTag(@RequestBody AddUserTagRequest addUserTagRequest, HttpServletRequest request) {
+        if (addUserTagRequest == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        User loginUser = userService.getLoginUser(request);
+        Boolean res = tagService.addUserTag(addUserTagRequest, loginUser);
+        return ResultUtils.success(res);
+    }
+
+    /**
+     * 用户移除自己的标签（单个移除）
+     * @param tagId 标签id
+     * @param request 登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    @GetMapping("/remove/user/tag")
+    private BaseResponse<Boolean> removeUserTag(@RequestParam("tagId") Long tagId, HttpServletRequest request) {
+        if (tagId <= 0) throw new BusinessException(ErrorCode.PARAMS_ERROR, "标签id错误");
+        User loginUser = userService.getLoginUser(request);
+        Boolean res = tagService.removeUserTag(tagId, loginUser);
+        return ResultUtils.success(res);
+    }
+
+    /**
+     * 按照标签使用人数组成热门标签推荐，如果用户登录，则过滤掉用户已有的标签
+     * @param pageRequest 请求体：分页参数
+     * @param request 登录信息
+     * @return 热门标签分页数据
+     */
+    @PostMapping("/hot/page")
+    private BaseResponse<PageResponse<List<TagVO>>> hotTagPage(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
+        PageResponse<List<TagVO>> res = tagService.hotTagPage(pageRequest, request);
         return ResultUtils.success(res);
     }
 }

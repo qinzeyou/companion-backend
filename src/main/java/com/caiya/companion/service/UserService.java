@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.caiya.companion.common.BaseResponse;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.vo.UserVO;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -116,5 +117,5 @@ public interface UserService extends IService<User> {
      * @param request
      * @return
      */
-    User getCurrentUser(HttpServletRequest request);
+    UserVO getCurrentUser(HttpServletRequest request);
 }

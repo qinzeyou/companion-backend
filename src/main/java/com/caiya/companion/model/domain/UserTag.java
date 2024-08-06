@@ -32,7 +32,7 @@ public class UserTag implements Serializable {
     /**
      * 控制标签的显示顺序，数值范围（0 - 10）
      */
-    private Integer index;
+    private Integer weight;
 
     /**
      * 创建时间

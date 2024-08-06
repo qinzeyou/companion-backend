@@ -1,8 +1,10 @@
 package com.caiya.companion.model.vo;
 
+import com.caiya.companion.model.domain.UserTag;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * @author caiya
@@ -11,8 +13,6 @@ import java.util.Date;
  */
 @Data
 public class UserVO {
-
-
     /**
      * 主键
      */
@@ -72,4 +72,10 @@ public class UserVO {
      * 更新时间
      */
     private Date updateTime;
+
+    // 非数据库字段
+    /**
+     * 用户标签列表
+     */
+    private List<UserTagVO> userTags;
 }

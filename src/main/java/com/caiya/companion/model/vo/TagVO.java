@@ -6,11 +6,16 @@ import java.util.Date;
 
 /**
  * @author caiya
- * @description 标签脱敏
+ * @description 脱敏后的标签信息
  * @create 2024-08-06 12:12
  */
 @Data
 public class TagVO {
+    /**
+     * id
+     */
+    private Long id;
+
     /**
      * 标签名称
      */

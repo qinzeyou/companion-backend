@@ -9,6 +9,7 @@ import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.request.UserLoginRequest;
 import com.caiya.companion.model.request.UserRegisterRequest;
+import com.caiya.companion.model.vo.UserVO;
 import com.caiya.companion.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -77,7 +78,7 @@ public class UserController {
      * @return
      */
     @GetMapping("/current")
-    public BaseResponse<User> getCurrentUser(HttpServletRequest request) {
+    public BaseResponse<UserVO> getCurrentUser(HttpServletRequest request) {
         // 旧版
 //        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
 //        long userId = currentUser.getId();
@@ -86,7 +87,7 @@ public class UserController {
 //        return ResultUtils.success(safetyUser);
 
         // 新版
-        User loginUser = userService.getCurrentUser(request);
+        UserVO loginUser = userService.getCurrentUser(request);
         return ResultUtils.success(loginUser);
     }
 

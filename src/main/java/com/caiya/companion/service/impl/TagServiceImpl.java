@@ -1,20 +1,23 @@
 package com.caiya.companion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.caiya.companion.common.ErrorCode;
+import com.caiya.companion.common.PageRequest;
+import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.TagMapper;
 import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTag;
 import com.caiya.companion.model.enums.TagStatusEnum;
+import com.caiya.companion.model.request.AddUserTagRequest;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
 import com.caiya.companion.model.vo.TagVO;
 import com.caiya.companion.service.TagService;
-import com.caiya.companion.service.UserService;
 import com.caiya.companion.service.UserTagService;
 import com.caiya.companion.utils.ColorUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -23,8 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletRequest;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.caiya.companion.constant.UserConstant.USER_LOGIN_STATE;
 
 /**
  * @author Administrator
@@ -40,7 +46,8 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
     @Resource
     private UserTagService userTagService;
     @Resource
-    private UserService userService;
+    private TagMapper tagMapper;
+
     /**
      * 标签 文字、背景 默认颜色
      */
@@ -207,8 +214,9 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
         for (Tag tag : tagList) {
             // 标签状态
             Integer status = tag.getStatus();
-            // 只处理：子标签 和 标签状态可见
-            if (Boolean.FALSE.equals(tag.getIsParent()) || Objects.equals(TagStatusEnum.getEnumByValue(status).getValue(), status)) continue;
+            // 子标签 和 标签状态不可见 跳过
+            if (Boolean.FALSE.equals(tag.getIsParent()) || Objects.equals(TagStatusEnum.NOT_VISIBLE.getValue(), status))
+                continue;
             ArrayList<Tag> childrenTagList = new ArrayList<>();
             for (Tag children : tagList) {
                 // 遍历标签列表，找到标签的 父id 与 当前标签id 相等，也就是有父子关系
@@ -225,7 +233,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             BeanUtils.copyProperties(tag, tagVO);
             // 子标签数组进行脱敏
             List<TagVO> childrenTagList = new ArrayList<>();
-            for (Tag  t : entry.getValue()) {
+            for (Tag t : entry.getValue()) {
                 TagVO vo = new TagVO();
                 BeanUtils.copyProperties(t, vo);
                 childrenTagList.add(vo);
@@ -235,5 +243,98 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             res.add(tagVO);
         }
         return res;
+    }
+
+    /**
+     * 用户添加自身标签
+     *
+     * @param addUserTagRequest 请求体
+     * @param loginUser         登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class) // 保证事务的原子性，语句要么都执行成功，要么都不成功
+    public Boolean addUserTag(AddUserTagRequest addUserTagRequest, User loginUser) {
+        // 判断排序是否超出范围 1 - 100
+        Integer weight = addUserTagRequest.getWeight();
+        if (weight <= 0 || weight > 100) throw new BusinessException(ErrorCode.PARAMS_ERROR, "标签排序权重错误");
+        // 获取标签信息
+        Tag tag = this.getById(addUserTagRequest.getTagId());
+        // 标签不存在，则抛出异常
+        if (tag == null) throw new BusinessException(ErrorCode.NULL_ERROR, "标签不存在");
+        // 标签状态需可见
+        Integer status = tag.getStatus();
+        if (Objects.equals(TagStatusEnum.NOT_VISIBLE.getValue(), status))
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "错误的请求标签");
+        // 只能添加子标签
+        if (Boolean.TRUE.equals(tag.getIsParent()))
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能添加子标签");
+        try {
+            // 数据库操作
+            // 添加关系数据
+            UserTag userTag = new UserTag();
+            userTag.setUserId(loginUser.getId());
+            userTag.setTagId(tag.getId());
+            userTag.setWeight(addUserTagRequest.getWeight());
+            userTagService.save(userTag);
+            // 修改标签使用人数
+            tag.setUserNumber(tag.getUserNumber() + 1);
+            this.updateById(tag);
+            return true;
+        } catch (Exception e) {
+            log.error("addUserTag err {}", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "添加标签失败");
+        }
+    }
+
+    /**
+     * 用户移除自己的标签（单个移除）
+     *
+     * @param tagId     标签id
+     * @param loginUser 登录信息
+     * @return 操作结果：true成功，false失败
+     */
+    @Override
+    public Boolean removeUserTag(Long tagId, User loginUser) {
+        // 移除关联关系
+        QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
+        userTagQueryWrapper.eq("tagId", tagId);
+        userTagQueryWrapper.eq("userId", loginUser.getId());
+        boolean res = userTagService.remove(userTagQueryWrapper);
+        return res;
+    }
+
+    /**
+     * 按照标签使用人数组成热门标签推荐，如果用户登录，则过滤掉用户已有的标签
+     *
+     * @param pageRequest 请求体：分页参数
+     * @param request     登录信息
+     * @return 热门标签分页数据
+     */
+    @Override
+    public PageResponse<List<TagVO>> hotTagPage(PageRequest pageRequest, HttpServletRequest request) {
+        // 获取用户信息
+        // 从session中获取用户信息
+        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        // 未登录：设置为0：按照标签使用人数查询标签
+        // 已登录：设置为用户id，过滤该用户已有的标签
+        Long userId = user == null ? 0L : user.getId();
+        // 分页参数
+        Integer pageNum = pageRequest.getPageNum(); // 页码
+        Integer pageSize = pageRequest.getPageSize(); // 每页条数
+        Integer offset = (pageNum - 1) * pageSize; // 计算SQL分页查询起始位置
+        List<Tag> tags = tagMapper.hotTagPage(offset, pageSize, userId);
+        List<TagVO> tagVOList = tags.stream().map(tag -> {
+            TagVO tagVO = new TagVO();
+            BeanUtils.copyProperties(tag, tagVO);
+            return tagVO;
+        }).collect(Collectors.toList());
+        // 封装分页结果集
+        PageResponse<List<TagVO>> response = new PageResponse<>();
+        response.setRecords(tagVOList);
+        response.setSize(pageSize);
+        response.setCurrent(pageNum);
+        response.setSize(tags.size());
+        return response;
     }
 }

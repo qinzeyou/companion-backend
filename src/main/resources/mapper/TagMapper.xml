@@ -24,4 +24,16 @@
         textColor,color,createTime,
         updateTime,isDelete
     </sql>
+
+    <select id="hotTagPage" resultMap="BaseResultMap">
+        select * from tag t
+        where not exists(
+            select 1
+            from user_tag ut
+            where ut.tagId = t.id and ut.userId = #{userId}
+        )
+        and t.isParent in (0)
+        order by t.id
+        limit #{offset}, #{pageSize}  # offset：查询起始位位置 limit：查询条数
+    </select>
 </mapper>

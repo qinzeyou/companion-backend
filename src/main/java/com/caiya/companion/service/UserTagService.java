@@ -9,5 +9,10 @@ import com.caiya.companion.model.domain.UserTag;
 * @createDate 2024-08-06 10:27:34
 */
 public interface UserTagService extends IService<UserTag> {
-
+//    /**
+//     * 根据用户id获取用户标签
+//     * @param userId 用户id
+//     * @return 用户所有的标签列表
+//     */
+//    List<TagVO> getTagByUserId(Long userId);
 }

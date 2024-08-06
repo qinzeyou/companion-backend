@@ -8,14 +8,22 @@ import com.caiya.companion.constant.UserConstant;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.mapper.UserMapper;
+import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.domain.UserTag;
+import com.caiya.companion.model.vo.TagVO;
+import com.caiya.companion.model.vo.UserTagVO;
+import com.caiya.companion.model.vo.UserVO;
+import com.caiya.companion.service.TagService;
 import com.caiya.companion.service.UserService;
+import com.caiya.companion.service.UserTagService;
 import com.caiya.companion.utils.AlgorithmUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
@@ -45,6 +53,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
 
     @Resource
     private UserMapper userMapper;
+    @Resource
+    private UserTagService userTagService;
+    @Resource
+    private TagService tagService;
 
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
@@ -357,12 +369,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public User getCurrentUser(HttpServletRequest request) {
+    public UserVO getCurrentUser(HttpServletRequest request) {
         User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
         if (currentUser == null) return null;
         long userId = currentUser.getId();
-        User dbUser = userMapper.selectById(userId);
-        return getSafetyUser(dbUser);
+        // 查询用户信息
+        User user = this.getById(userId);
+        if (user == null) throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户数据查询错误");
+        // 获取用户所有的标签列表
+        QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
+        userTagQueryWrapper.eq("userId", userId);
+        List<UserTag> findUserTags = userTagService.list(userTagQueryWrapper);
+        // 标签信息处理：将标签信息脱敏
+        // 存储脱敏后的标签信息
+        List<UserTagVO> userTags = new ArrayList<>();
+        // 遍历用户自己有的标签关系数组
+        for (UserTag userTag :findUserTags) {
+            // 获取标签具体信息
+            Long tagId = userTag.getTagId();
+            Tag tag = tagService.getById(tagId);
+            // 信息脱敏
+            TagVO tagVO = new TagVO();
+            BeanUtils.copyProperties(tag, tagVO);
+            UserTagVO userTagVO = new UserTagVO();
+            userTagVO.setTag(tagVO);
+            userTagVO.setWeight(userTag.getWeight());
+            userTags.add(userTagVO);
+        }
+        // 按照标签权重进行排序
+        userTags = userTags.stream().sorted(Comparator.comparingInt(UserTagVO::getWeight).reversed()).collect(Collectors.toList());
+        // 用户信息脱敏
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        userVO.setUserTags(userTags);
+        return userVO;
     }
 
     /**
