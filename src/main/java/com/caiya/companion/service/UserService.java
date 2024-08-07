@@ -32,7 +32,7 @@ public interface UserService extends IService<User> {
      * @param request http请求
      * @return 脱敏后的用户信息
      */
-    User userLogin(String userAccount, String password, HttpServletRequest request);
+    UserVO userLogin(String userAccount, String password, HttpServletRequest request);
 
     /**
      * 用户数据脱敏
@@ -68,6 +68,14 @@ public interface UserService extends IService<User> {
     boolean isAdmin(User loginUser);
 
     /**
+     * 判断是否为管理员
+     *
+     * @param loginUser
+     * @return
+     */
+    boolean isAdmin(UserVO loginUser);
+
+    /**
      * 修改用户数据
      *
      * @param user
@@ -101,7 +109,7 @@ public interface UserService extends IService<User> {
      * @param request
      * @return
      */
-    List<User> matchUsers(Integer num, HttpServletRequest request);
+    List<UserVO> matchUsers(Integer num, HttpServletRequest request);
 
     /**
      * 获取当前登录用户信息

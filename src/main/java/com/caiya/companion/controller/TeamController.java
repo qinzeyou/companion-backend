@@ -41,14 +41,14 @@ public class TeamController {
     private UserService userService;
 
     @PostMapping("/add")
-    public BaseResponse<Long> addTeam(@RequestBody TeamAddRequest teamAddRequest, HttpServletRequest request) {
+    public BaseResponse<Long> addTeam(@RequestBody TeamAddRequest teamAddRequest) {
         if (teamAddRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        User loginUser = userService.getLoginUser(request);
-        long teamId = teamService.addTeam(teamAddRequest, loginUser);
+        long teamId = teamService.addTeam(teamAddRequest);
         return ResultUtils.success(teamId);
     }
+
 
     @PutMapping("/update")
     public BaseResponse<Boolean> updateTeam(@RequestBody TeamUpdateRequest teamUpdateRequest, HttpServletRequest request) {
@@ -60,7 +60,14 @@ public class TeamController {
         return ResultUtils.success(result);
     }
 
-    @PostMapping("/list")
+    /**
+     * 条件查询队伍列表
+     *
+     * @param teamListQO 查询请求体
+     * @param request 登录信息
+     * @return 条件分页查询的队伍数据
+     */
+    @PostMapping("/search/page")
     public BaseResponse<List<TeamUserVO>> listTeam(@RequestBody TeamListQO teamListQO, HttpServletRequest request) {
         if (teamListQO == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -70,11 +77,11 @@ public class TeamController {
     }
 
     /**
-     * 获取分页的队伍数据
-     * @param pageRequest
-     * @return
+     * 获取分页推荐的队伍数据
+     * @param pageRequest 分页参数
+     * @return 队伍数据
      */
-    @PostMapping("/page/list")
+    @PostMapping("/recommend/page")
     public BaseResponse<PageResponse<List<TeamUserVO>>> recommendTeamList(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
         if (pageRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
@@ -113,7 +120,11 @@ public class TeamController {
         return ResultUtils.success(result);
     }
 
-    // todo 实现分页
+    /**
+     * 获取简单分页队伍数据接口
+     * @param teamListQO 查询请求体
+     * @return 队伍分页数据
+     */
     @PostMapping("/list/page")
     public BaseResponse<Page<Team>> listTeamByPage(@RequestBody TeamListQO teamListQO) {
         if (teamListQO == null) {

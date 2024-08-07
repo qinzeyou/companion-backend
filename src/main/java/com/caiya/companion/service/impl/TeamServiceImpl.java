@@ -8,6 +8,7 @@ import com.caiya.companion.common.PageRequest;
 import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.TeamMapper;
+import com.caiya.companion.mapper.UserMapper;
 import com.caiya.companion.model.domain.Team;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTeam;
@@ -51,22 +52,26 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
 
     @Resource
     private UserService userService;
+    @Resource
+    private UserMapper userMapper;
 
     /**
      * 创建队伍
      *
-     * @param teamAddRequest
-     * @param loginUser
-     * @return
+     * @param teamAddRequest 请求体
+     * @return 添加成功的队伍id
      */
     @Override
     @Transactional(rollbackFor = Exception.class) // 保证事务的原子性，语句要么都执行成功，要么都不成功
-    public long addTeam(TeamAddRequest teamAddRequest, User loginUser) {
+    public long addTeam(TeamAddRequest teamAddRequest) {
+        // 判断用户是否存在
+        Long userId = teamAddRequest.getUserId();
+        User user = userMapper.selectById(userId);
+        if (user == null) throw new BusinessException(ErrorCode.PARAMS_ERROR, "创建人不存在");
         //  1. 请求参数是否为空
         if (teamAddRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        final long userId = loginUser.getId();
         //  2. 队伍人数 > 1 且 <= 20
         Integer maxNum = teamAddRequest.getMaxNum();
         if (maxNum < 1 || maxNum > 20) {
@@ -138,7 +143,8 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     @Override
     public List<TeamUserVO> listTeam(TeamListQO teamListQO, HttpServletRequest request) {
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
-        User loginUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        // 获取当前登录用户信息
+        UserVO loginUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
         // 组合查询条件
         if (teamListQO != null) {
             // 根据队伍id查询
@@ -151,12 +157,12 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             if (StringUtils.isNotBlank(searchText)) {
                 queryWrapper.and(qw -> qw.like("name", searchText).or().like("description", searchText));
             }
-            // 根据队伍名称查询
+            // 根据【队伍名称】查询
             String name = teamListQO.getName();
             if (StringUtils.isNotBlank(name)) {
                 queryWrapper.like("name", name);
             }
-            // 根据队伍描述查询
+            // 根据【队伍描述】查询
             String description = teamListQO.getDescription();
             if (StringUtils.isNotBlank(description)) {
                 queryWrapper.like("description", description);
@@ -185,11 +191,15 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             }
         }
         // 不展示已过期的队伍
-        queryWrapper.and(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
+        queryWrapper.nested(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
+        // 条件查询队伍
         List<Team> teamList = this.list(queryWrapper);
+        // 如果查询出队伍数据为空，则直接返回空数组
         if (CollectionUtils.isEmpty(teamList)) {
             return new ArrayList<>();
         }
+        // 处理用户与队伍关系
+        // 存储用户已加入的队伍id，用于过滤用户已加入的队伍
         List<Long> userTeamIdList = new ArrayList<>();
         if (loginUser != null) {
             // 获取当前登录用户加入的队伍
@@ -209,14 +219,15 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             // 获取创建人id
             Long userId = team.getUserId();
             if (userId == null) continue;
+            // 创建人信息
             User user = userService.getById(userId);
-            User safetyUser = userService.getSafetyUser(user);
             // 脱敏队伍信息
             TeamUserVO teamUserVO = new TeamUserVO();
             BeanUtils.copyProperties(team, teamUserVO);
+            // 用户信息脱敏
             if (user != null) {
                 UserVO userVO = new UserVO();
-                BeanUtils.copyProperties(safetyUser, userVO);
+                BeanUtils.copyProperties(user, userVO);
                 teamUserVO.setCreateUser(userVO);
             }
             // 设置该用户是否加入队伍的标识
@@ -224,15 +235,20 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
             // 获取该队伍加入的用户
             QueryWrapper<UserTeam> userTeamQueryWrapper = new QueryWrapper<>();
             userTeamQueryWrapper.eq("teamId", team.getId());
+            // 查询该队伍的用户队伍关系数据
             List<UserTeam> userTeamList = userTeamService.list(userTeamQueryWrapper);
+            // 该队伍已经加入的用户id
             List<Long> joinTeamUserIdList = userTeamList.stream().map(UserTeam::getUserId).collect(Collectors.toList());
+            // 存储已加入队伍的脱敏后用户数据
             ArrayList<UserVO> joinUserVOS = new ArrayList<>();
+            // 对已加入的用户数据进行脱敏
             for (Long joinUserId : joinTeamUserIdList) {
-                User joinUse = userService.getById(joinUserId);
+                User joinUser = userService.getById(joinUserId);
                 UserVO userVO = new UserVO();
-                BeanUtils.copyProperties(joinUse, userVO);
+                BeanUtils.copyProperties(joinUser, userVO);
                 joinUserVOS.add(userVO);
             }
+            // 设置已加入的队伍列表数据
             teamUserVO.setJoinUserList(joinUserVOS);
             teamUserVOList.add(teamUserVO);
         }
@@ -536,13 +552,15 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
     /**
      * 获取分页的队伍数据
      *
-     * @param pageRequest
-     * @return
+     * @param pageRequest 分页数据
+     * @return 分页队伍数据
      */
     @Override
     public PageResponse<List<TeamUserVO>> recommendTeamList(PageRequest pageRequest, HttpServletRequest request) {
         // 获取分页队伍数据
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
+        // 不推荐已过期的队伍
+//        queryWrapper.nested(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
         Page<Team> page = new Page<>(pageRequest.getPageNum(), pageRequest.getPageSize());
         Page<Team> teamPage = page(page, queryWrapper);
         List<Team> teamList = teamPage.getRecords();

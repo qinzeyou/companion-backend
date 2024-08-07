@@ -1,8 +1,10 @@
 package com.caiya.companion.model.vo;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.caiya.companion.model.domain.UserTag;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -12,7 +14,10 @@ import java.util.List;
  * @create 2024-07-09 08:13
  */
 @Data
-public class UserVO {
+public class UserVO implements Serializable {
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
+
     /**
      * 主键
      */
@@ -67,6 +72,11 @@ public class UserVO {
      * 标签 json 列表
      */
     private String tags;
+
+    /**
+     * 用户角色 0 普通用户 1 管理员
+     */
+    private Integer userRole;
 
     /**
      * 更新时间

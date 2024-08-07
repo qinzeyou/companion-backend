@@ -61,13 +61,13 @@ public class UserController {
      * @return
      */
     @PostMapping("/login")
-    public BaseResponse<User> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
+    public BaseResponse<UserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
         if (userLoginRequest == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
         String userAccount = userLoginRequest.getUserAccount();
         String password = userLoginRequest.getPassword();
         // 判断参数是否为空
         if (StringUtils.isAnyBlank(userAccount, password)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        User user = userService.userLogin(userAccount, password, request);
+        UserVO user = userService.userLogin(userAccount, password, request);
         return ResultUtils.success(user);
     }
 
@@ -79,14 +79,6 @@ public class UserController {
      */
     @GetMapping("/current")
     public BaseResponse<UserVO> getCurrentUser(HttpServletRequest request) {
-        // 旧版
-//        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
-//        long userId = currentUser.getId();
-//        User dbUser = userService.getById(userId);
-//        User safetyUser = userService.getSafetyUser(dbUser);
-//        return ResultUtils.success(safetyUser);
-
-        // 新版
         UserVO loginUser = userService.getCurrentUser(request);
         return ResultUtils.success(loginUser);
     }
@@ -118,7 +110,6 @@ public class UserController {
      * @param pageSize
      * @return
      */
-    // todo 未实现推荐
     @GetMapping("/recommend")
     public BaseResponse<Page<User>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
         Page<User> userPage = userService.recommendUsers(pageNum, pageSize, request);
@@ -133,11 +124,11 @@ public class UserController {
      * @return
      */
     @GetMapping("/match/{num}")
-    public BaseResponse<List<User>> matchUsers(@PathVariable Integer num, HttpServletRequest request) {
+    public BaseResponse<List<UserVO>> matchUsers(@PathVariable Integer num, HttpServletRequest request) {
         if (num <= 0) {
             num = 10;
         }
-        List<User> userPage = userService.matchUsers(num, request);
+        List<UserVO> userPage = userService.matchUsers(num, request);
         return ResultUtils.success(userPage);
     }
 

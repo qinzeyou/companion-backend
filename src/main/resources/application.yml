@@ -41,6 +41,11 @@ spring:
   mvc:
     path match:
       matching-strategy: ant_path_matcher
+  # 文件上传配置
+  servlet:
+    multipart:
+      max-file-size: 2MB # 单个文件大小限制
+      max-request-size: 2MB # 总请求大小限制
 
 # mybatis-plus配置
 mybatis-plus:

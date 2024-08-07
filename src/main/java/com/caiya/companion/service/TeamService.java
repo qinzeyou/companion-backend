@@ -28,10 +28,9 @@ public interface TeamService extends IService<Team> {
      * 创建队伍
      *
      * @param teamAddRequest
-     * @param loginUser
      * @return
      */
-    long addTeam(TeamAddRequest teamAddRequest, User loginUser);
+    long addTeam(TeamAddRequest teamAddRequest);
 
     /**
      * 条件查询队伍列表

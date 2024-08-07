@@ -17,6 +17,7 @@ import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
 import com.caiya.companion.model.vo.TagVO;
+import com.caiya.companion.model.vo.UserVO;
 import com.caiya.companion.service.TagService;
 import com.caiya.companion.utils.ColorUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -251,13 +252,13 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
     public PageResponse<List<TagVO>> hotTagPage(PageRequest pageRequest, HttpServletRequest request) {
         // 获取用户信息
         // 从session中获取用户信息
-        User user = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        UserVO user = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
         // 未登录：设置为0：按照标签使用人数查询标签
         // 已登录：设置为用户id，过滤该用户已有的标签
         Long userId = user == null ? 0L : user.getId();
         // 分页参数
-        Integer pageNum = pageRequest.getPageNum(); // 页码
-        Integer pageSize = pageRequest.getPageSize(); // 每页条数
+        int pageNum = pageRequest.getPageNum(); // 页码
+        int pageSize = pageRequest.getPageSize(); // 每页条数
         Integer offset = (pageNum - 1) * pageSize; // 计算SQL分页查询起始位置
         List<Tag> tags = tagMapper.hotTagPage(offset, pageSize, userId);
         List<TagVO> tagVOList = tags.stream().map(tag -> {

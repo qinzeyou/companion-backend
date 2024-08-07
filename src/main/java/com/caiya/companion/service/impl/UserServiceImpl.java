@@ -7,6 +7,7 @@ import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.constant.UserConstant;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.UserMapper;
+import com.caiya.companion.mapper.UserTagMapper;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTag;
 import com.caiya.companion.model.vo.TagVO;
@@ -52,6 +53,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserTagService userTagService;
     @Resource
+    private UserTagMapper userTagMapper;
+    @Resource
     private RedisTemplate<String, Object> redisTemplate;
 
     /**
@@ -92,7 +95,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     }
 
     @Override
-    public User userLogin(String userAccount, String password, HttpServletRequest request) {
+    public UserVO userLogin(String userAccount, String password, HttpServletRequest request) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, password)) throw new BusinessException(ErrorCode.NULL_ERROR);
         // 校验长度
@@ -114,12 +117,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         if (user == null) throw new BusinessException(ErrorCode.NULL_ERROR);
 
         // 脱敏
-        User safetyUser = getSafetyUser(user);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
 
         // 存储登录态
-        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, safetyUser);
+        request.getSession().setAttribute(UserConstant.USER_LOGIN_STATE, userVO);
 
-        return safetyUser;
+        return userVO;
     }
 
     /**
@@ -187,6 +191,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         return loginUser.getUserRole() == ADMIN_ROLE;
     }
 
+    @Override
+    public boolean isAdmin(UserVO loginUser) {
+        // 判断用户是否为空
+        if (loginUser == null) throw new BusinessException(ErrorCode.NO_AUTH);
+        return loginUser.getUserRole() == ADMIN_ROLE;
+    }
+
     /**
      * 修改用户数据，只有管理员 或 用户只能修改自己的信息
      *
@@ -221,7 +232,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public User getLoginUser(HttpServletRequest request) {
-        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        UserVO currentUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
         if (currentUser == null) throw new BusinessException(ErrorCode.NULL_ERROR);
         long userId = currentUser.getId();
         User dbUser = userMapper.selectById(userId);
@@ -238,7 +249,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public Page<User> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
-        User loginUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        UserVO loginUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
         String redisKey = "companion:user:recommend:%s";
         // 判断用户是否登录，如果登录则根据登录用户id来存取缓存
         if (loginUser != null) {
@@ -275,49 +286,104 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public List<User> matchUsers(Integer num, HttpServletRequest request) {
+    public List<UserVO> matchUsers(Integer num, HttpServletRequest request) {
         // 获取所有用户信息
-        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
-        userQueryWrapper.isNotNull("tags");
-        // 原始用户数据列表
-        List<User> originUserList = this.list(userQueryWrapper);
+        List<User> originUserList = userMapper.selectList(new QueryWrapper<>());
         // 获取登录用户信息作为推荐
         User loginUser = getLoginUser(request);
-        // 1. 如果用户未登录，则随机取出用户
-        if (loginUser == null) {
-            return getRandomElements(originUserList, num);
+        // 存储 拥有标签数据 的用户
+        List<UserVO> userVOList = new ArrayList<>();
+        // 处理用户数据，统一查询用户的标签，并设置到字段中
+        for (User user : originUserList) {
+            // 根据用户id查询出他所属的标签（已脱敏）
+            List<TagVO> userTagVOList = userTagService.getTagByUserId(user.getId());
+            // 用户信息脱敏
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            // 将标签数组存到字段中
+            userVO.setUserTags(userTagVOList);
+            userVOList.add(userVO);
         }
 
-        // 2. 如果用户已登录，则根据编辑距离算法进行推荐
-        // 获取登录用户的标签
-        String loginUserTags = loginUser.getTags();
-        Gson gson = new Gson();
-        // 将获取到标签转为java数组对象，因为从登录用户取出的是字符串类型的，需要转一下，方便后面操作
-        List<String> loginUserTagList = gson.fromJson(loginUserTags, new TypeToken<List<String>>() {
-        }.getType());
+        // 如果用户未登录，则随机取出用户
+        if (loginUser == null)
+            return getRandomElements(userVOList, num);
         // 用户列表的下标 => 相似度
-        List<Pair<User, Long>> indexUserDistanceList = new ArrayList<>();
+        List<Pair<UserVO, Long>> indexUserDistanceList = new ArrayList<>();
+        // 当前登录用户所属的标签名称数组
+        List<String> loginUserTagNameList = userTagService.getTagByUserId(loginUser.getId()).stream().map(TagVO::getTagName).collect(Collectors.toList());
         // 依次计算所有用户和当前用户的相似度
-        for (int i = 0; i < originUserList.size(); i++) {
-            User user = originUserList.get(i);
-            String userTags = user.getTags();
-            List<String> userTagsList = gson.fromJson(userTags, new TypeToken<List<String>>() {
-            }.getType());
+        for (UserVO matchUser : userVOList) {
+            // 待匹配用户所属的标签名称数组
+            List<String> matchUserTagNameList = matchUser.getUserTags().stream().map(TagVO::getTagName).collect(Collectors.toList());
+
             // 标签为空 || 剔除自己
-            if (CollectionUtils.isEmpty(userTagsList) || Objects.equals(user.getId(), loginUser.getId())) continue;
+            if (CollectionUtils.isEmpty(matchUserTagNameList) || Objects.equals(matchUser.getId(), loginUser.getId()))
+                continue;
             // 计算分数
-            long distance = AlgorithmUtils.minDistance(loginUserTagList, userTagsList);
-            indexUserDistanceList.add(new Pair<>(user, distance));
+            long distance = AlgorithmUtils.minDistance(loginUserTagNameList, matchUserTagNameList);
+            indexUserDistanceList.add(new Pair<>(matchUser, distance));
         }
         // 根据编辑距离排序，距离越小，用户相似度越高
-        List<Pair<User, Long>> topUserPairList = indexUserDistanceList.stream()
+        List<Pair<UserVO, Long>> topUserPairList = indexUserDistanceList.stream()
                 .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
                 .limit(num)
                 .collect(Collectors.toList());
         // 取出key：用户
-        List<User> result = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
-        return result;
+        return topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
     }
+
+//    /**
+//     * 推荐匹配用户列表
+//     *
+//     * @param num
+//     * @param request
+//     * @return
+//     */
+//    @Override
+//    public List<User> matchUsers(Integer num, HttpServletRequest request) {
+//        // 获取所有用户信息
+//        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
+//        userQueryWrapper.isNotNull("tags");
+//        // 原始用户数据列表
+//        List<User> originUserList = this.list(userQueryWrapper);
+//        // 获取登录用户信息作为推荐
+//        User loginUser = getLoginUser(request);
+//        // 1. 如果用户未登录，则随机取出用户
+//        if (loginUser == null) {
+//            return getRandomElements(originUserList, num);
+//        }
+//
+//        // 2. 如果用户已登录，则根据编辑距离算法进行推荐
+//        // 获取登录用户的标签
+//        String loginUserTags = loginUser.getTags();
+//        Gson gson = new Gson();
+//        // 将获取到标签转为java数组对象，因为从登录用户取出的是字符串类型的，需要转一下，方便后面操作
+//        List<String> loginUserTagList = gson.fromJson(loginUserTags, new TypeToken<List<String>>() {
+//        }.getType());
+//        // 用户列表的下标 => 相似度
+//        List<Pair<User, Long>> indexUserDistanceList = new ArrayList<>();
+//        // 依次计算所有用户和当前用户的相似度
+//        for (int i = 0; i < originUserList.size(); i++) {
+//            User user = originUserList.get(i);
+//            String userTags = user.getTags();
+//            List<String> userTagsList = gson.fromJson(userTags, new TypeToken<List<String>>() {
+//            }.getType());
+//            // 标签为空 || 剔除自己
+//            if (CollectionUtils.isEmpty(userTagsList) || Objects.equals(user.getId(), loginUser.getId())) continue;
+//            // 计算分数
+//            long distance = AlgorithmUtils.minDistance(loginUserTagList, userTagsList);
+//            indexUserDistanceList.add(new Pair<>(user, distance));
+//        }
+//        // 根据编辑距离排序，距离越小，用户相似度越高
+//        List<Pair<User, Long>> topUserPairList = indexUserDistanceList.stream()
+//                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
+//                .limit(num)
+//                .collect(Collectors.toList());
+//        // 取出key：用户
+//        List<User> result = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
+//        return result;
+//    }
 
     /**
      * 获取当前登录用户信息
@@ -327,7 +393,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      */
     @Override
     public UserVO getCurrentUser(HttpServletRequest request) {
-        User currentUser = (User) request.getSession().getAttribute(USER_LOGIN_STATE);
+        UserVO currentUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
         if (currentUser == null) return null;
         long userId = currentUser.getId();
         // 查询用户信息
@@ -358,10 +424,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
         userTagQueryWrapper.in("tagId", tagIdList);
         List<UserTag> userTags = userTagService.list(userTagQueryWrapper);
-        return userTags.stream().map(userTag -> {
+        // 结果集
+        List<UserVO> res = new ArrayList<>();
+        // 去重，因为遍历所有用户标签关系，如果一个用户同事存在多个标签，会重复添加到结果中
+        Set<Long> userIdSet = new HashSet<>();
+        for (UserTag userTag : userTags) {
+            // 用户信息
             // 获取用户id，查询用户信息
             Long userId = userTag.getUserId();
-            // 用户信息
+            // 如果该用户已存在结果集中，则跳过，避免出现重复用户
+            if (userIdSet.contains(userId)) continue;
             User user = userMapper.selectById(userId);
             // 根据用户id查询用户身上所有的标签，返回脱敏的标签列表
             List<TagVO> tagVOList = userTagService.getTagByUserId(userId);
@@ -369,24 +441,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
             UserVO userVO = new UserVO();
             BeanUtils.copyProperties(user, userVO);
             userVO.setUserTags(tagVOList);
-            return userVO;
-        }).collect(Collectors.toList());
+            res.add(userVO);
+            userIdSet.add(userId);
+        }
+
+        return res;
     }
 
     /**
      * 随机取出指定条数的用户数据
      *
-     * @param list
-     * @param num
-     * @return
+     * @param list 待随机的用户数组
+     * @param num  指定条数
+     * @return 随机不重复的制定条数的用户数据数组
      */
-    public static List<User> getRandomElements(List<User> list, int num) {
+    public static List<UserVO> getRandomElements(List<UserVO> list, int num) {
         Random rand = new Random();
-        List<User> result = new ArrayList<>();
+        List<UserVO> result = new ArrayList<>();
 
         while (result.size() < num) {
             int index = rand.nextInt(list.size());
-            if (!result.contains(list.get(index))) { // 防止重复（如果需要的话）
+            if (!result.contains(list.get(index))) { // 防止重复
                 result.add(list.get(index));
             }
         }
