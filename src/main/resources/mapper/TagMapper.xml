@@ -30,7 +30,7 @@
         where not exists(
             select 1
             from user_tag ut
-            where ut.tagId = t.id and ut.userId = #{userId}
+            where ut.tagId = t.id and ut.userId = #{userId} and ut.isDelete not in (1)
         )
         and t.isParent in (0)
         order by t.id

@@ -35,6 +35,20 @@ public class UserTag implements Serializable {
     private Integer weight;
 
     /**
+     * 标签文字颜色
+     * 使用mybatis-plus提供的自动填充策略。在插入数据时自动填充系统配置的默认颜色
+     */
+    @TableField(value = "textColor", fill = FieldFill.INSERT)
+    private String textColor;
+
+    /**
+     * 背景颜色
+     * 使用mybatis-plus提供的自动填充策略。在插入数据时自动填充系统配置的默认颜色
+     */
+    @TableField(value = "color",fill = FieldFill.INSERT)
+    private String color;
+
+    /**
      * 创建时间
      */
     private Date createTime;

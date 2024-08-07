@@ -22,6 +22,11 @@ public class TagVO {
     private String tagName;
 
     /**
+     * 权重，控制用户自身标签的显示顺序，权重越高，标签越靠前
+     */
+    private Integer weight;
+
+    /**
      * 创建者id
      */
     private Long userId;

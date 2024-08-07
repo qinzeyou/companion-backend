@@ -77,5 +77,5 @@ public class UserVO {
     /**
      * 用户标签列表
      */
-    private List<UserTagVO> userTags;
+    private List<TagVO> userTags;
 }

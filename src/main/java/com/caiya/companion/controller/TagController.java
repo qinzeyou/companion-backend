@@ -3,7 +3,6 @@ package com.caiya.companion.controller;
 import com.caiya.companion.common.*;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.User;
-import com.caiya.companion.model.request.AddUserTagRequest;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
@@ -80,34 +79,6 @@ public class TagController {
     @GetMapping("/tree")
     private BaseResponse<List<TagTreeVO>> treeTag() {
         List<TagTreeVO> res = tagService.treeTag();
-        return ResultUtils.success(res);
-    }
-
-    /**
-     * 用户添加自身标签
-     * @param addUserTagRequest 请求体
-     * @param request 登录信息
-     * @return 操作结果：true成功，false失败
-     */
-    @PostMapping("/add/user/tag")
-    private BaseResponse<Boolean> addUserTag(@RequestBody AddUserTagRequest addUserTagRequest, HttpServletRequest request) {
-        if (addUserTagRequest == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        User loginUser = userService.getLoginUser(request);
-        Boolean res = tagService.addUserTag(addUserTagRequest, loginUser);
-        return ResultUtils.success(res);
-    }
-
-    /**
-     * 用户移除自己的标签（单个移除）
-     * @param tagId 标签id
-     * @param request 登录信息
-     * @return 操作结果：true成功，false失败
-     */
-    @GetMapping("/remove/user/tag")
-    private BaseResponse<Boolean> removeUserTag(@RequestParam("tagId") Long tagId, HttpServletRequest request) {
-        if (tagId <= 0) throw new BusinessException(ErrorCode.PARAMS_ERROR, "标签id错误");
-        User loginUser = userService.getLoginUser(request);
-        Boolean res = tagService.removeUserTag(tagId, loginUser);
         return ResultUtils.success(res);
     }
 

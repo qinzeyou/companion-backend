@@ -1,27 +1,27 @@
 package com.caiya.companion.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.common.PageRequest;
 import com.caiya.companion.common.PageResponse;
+import com.caiya.companion.constant.SystemConstant;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.TagMapper;
+import com.caiya.companion.mapper.UserTagMapper;
 import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTag;
 import com.caiya.companion.model.enums.TagStatusEnum;
-import com.caiya.companion.model.request.AddUserTagRequest;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
 import com.caiya.companion.model.vo.TagVO;
 import com.caiya.companion.service.TagService;
-import com.caiya.companion.service.UserTagService;
 import com.caiya.companion.utils.ColorUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,17 +41,12 @@ import static com.caiya.companion.constant.UserConstant.USER_LOGIN_STATE;
 public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
         implements TagService {
 
-    @Resource
+    @Autowired
     private ColorUtils colorUtils;
     @Resource
-    private UserTagService userTagService;
+    private UserTagMapper userTagMapper;
     @Resource
     private TagMapper tagMapper;
-
-    /**
-     * 标签 文字、背景 默认颜色
-     */
-    private static final String DEFAULT_TAG_COLOR = "#1989fa";
 
 
     /**
@@ -87,8 +82,8 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             if (StringUtils.isNotBlank(color) && !colorUtils.isValidHexColor(color))
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "颜色只能输入十六进制");
             // 如果没有传入颜色，则设置默认颜色
-            tagAddRequest.setTextColor(textColor != null ? textColor : DEFAULT_TAG_COLOR);
-            tagAddRequest.setColor(textColor != null ? textColor : DEFAULT_TAG_COLOR);
+            tagAddRequest.setTextColor(textColor != null ? textColor : SystemConstant.TAG_TEXT_COLOR);
+            tagAddRequest.setColor(textColor != null ? textColor : SystemConstant.TAG_COLOR);
             // 标签的父标签id为空，则默认存到 父标签【其他】
             if (tagAddRequest.getParentId() == null) {
                 QueryWrapper<Tag> tagQueryWrapper = new QueryWrapper<>();
@@ -133,7 +128,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             // 删除用户标签关联关系
             QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
             userTagQueryWrapper.in("tagId", childrenTagList);
-            userTagService.remove(userTagQueryWrapper);
+            userTagMapper.delete(userTagQueryWrapper);
             // 删除标签
             QueryWrapper<Tag> tagQueryWrapper = new QueryWrapper<>();
             tagQueryWrapper.in("id", childrenTagList);
@@ -178,8 +173,8 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             if (StringUtils.isNotBlank(color) && !colorUtils.isValidHexColor(color))
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, "颜色只能输入十六进制");
             // 如果没有传入颜色，则设置默认颜色
-            tagUpdateRequest.setTextColor(textColor != null ? textColor : DEFAULT_TAG_COLOR);
-            tagUpdateRequest.setColor(textColor != null ? textColor : DEFAULT_TAG_COLOR);
+            tagUpdateRequest.setTextColor(textColor != null ? textColor : SystemConstant.TAG_TEXT_COLOR);
+            tagUpdateRequest.setColor(textColor != null ? textColor : SystemConstant.TAG_COLOR);
         }
         // 标签是否存在
         Tag tag = this.getById(tagUpdateRequest.getId());
@@ -242,65 +237,6 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
             tagVO.setChildren(childrenTagList);
             res.add(tagVO);
         }
-        return res;
-    }
-
-    /**
-     * 用户添加自身标签
-     *
-     * @param addUserTagRequest 请求体
-     * @param loginUser         登录信息
-     * @return 操作结果：true成功，false失败
-     */
-    @Override
-    @Transactional(rollbackFor = Exception.class) // 保证事务的原子性，语句要么都执行成功，要么都不成功
-    public Boolean addUserTag(AddUserTagRequest addUserTagRequest, User loginUser) {
-        // 判断排序是否超出范围 1 - 100
-        Integer weight = addUserTagRequest.getWeight();
-        if (weight <= 0 || weight > 100) throw new BusinessException(ErrorCode.PARAMS_ERROR, "标签排序权重错误");
-        // 获取标签信息
-        Tag tag = this.getById(addUserTagRequest.getTagId());
-        // 标签不存在，则抛出异常
-        if (tag == null) throw new BusinessException(ErrorCode.NULL_ERROR, "标签不存在");
-        // 标签状态需可见
-        Integer status = tag.getStatus();
-        if (Objects.equals(TagStatusEnum.NOT_VISIBLE.getValue(), status))
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "错误的请求标签");
-        // 只能添加子标签
-        if (Boolean.TRUE.equals(tag.getIsParent()))
-            throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能添加子标签");
-        try {
-            // 数据库操作
-            // 添加关系数据
-            UserTag userTag = new UserTag();
-            userTag.setUserId(loginUser.getId());
-            userTag.setTagId(tag.getId());
-            userTag.setWeight(addUserTagRequest.getWeight());
-            userTagService.save(userTag);
-            // 修改标签使用人数
-            tag.setUserNumber(tag.getUserNumber() + 1);
-            this.updateById(tag);
-            return true;
-        } catch (Exception e) {
-            log.error("addUserTag err {}", e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "添加标签失败");
-        }
-    }
-
-    /**
-     * 用户移除自己的标签（单个移除）
-     *
-     * @param tagId     标签id
-     * @param loginUser 登录信息
-     * @return 操作结果：true成功，false失败
-     */
-    @Override
-    public Boolean removeUserTag(Long tagId, User loginUser) {
-        // 移除关联关系
-        QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
-        userTagQueryWrapper.eq("tagId", tagId);
-        userTagQueryWrapper.eq("userId", loginUser.getId());
-        boolean res = userTagService.remove(userTagQueryWrapper);
         return res;
     }
 

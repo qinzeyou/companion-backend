@@ -3,18 +3,14 @@ package com.caiya.companion.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.caiya.companion.common.ResultUtils;
+import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.constant.UserConstant;
 import com.caiya.companion.exception.BusinessException;
-import com.caiya.companion.common.ErrorCode;
 import com.caiya.companion.mapper.UserMapper;
-import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTag;
 import com.caiya.companion.model.vo.TagVO;
-import com.caiya.companion.model.vo.UserTagVO;
 import com.caiya.companion.model.vo.UserVO;
-import com.caiya.companion.service.TagService;
 import com.caiya.companion.service.UserService;
 import com.caiya.companion.service.UserTagService;
 import com.caiya.companion.utils.AlgorithmUtils;
@@ -24,6 +20,7 @@ import javafx.util.Pair;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Service;
@@ -32,7 +29,6 @@ import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.nio.file.OpenOption;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -55,9 +51,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     private UserMapper userMapper;
     @Resource
     private UserTagService userTagService;
-    @Resource
-    private TagService tagService;
-
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
 
@@ -164,42 +157,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public int userLogout(HttpServletRequest request) {
         request.getSession().removeAttribute(UserConstant.USER_LOGIN_STATE);
         return 1;
-    }
-
-    /**
-     * 根据标签列表查询用户（内存过滤）
-     *
-     * @param tagNameList 标签列表
-     * @return 匹配的用户数组
-     */
-    @Override
-    public List<User> searchUserByTags(List<String> tagNameList) {
-        // 判断列表是否为空
-        if (CollectionUtils.isEmpty(tagNameList)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-
-        // 方式二：内存查询
-        // 1. 查询所有用户
-        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
-        List<User> userList = userMapper.selectList(queryWrapper);
-        Gson gson = new Gson();
-        // 2. 判断用户是否有该标签
-        userList = userList.stream().filter(user -> { // 遍历所有用户
-            String tagsStr = user.getTags(); // 获取该用户的标签列表
-            // 将用户标签列表转为java对象
-            // gson（参数1：要转为java对象的数据，转为具体java对象的类型，因为java不支持直接获取类型，所以改为TypeToken获取具体的java对象类型）
-            Set<String> tmpTagNameListSet = gson.fromJson(tagsStr, new TypeToken<Set<String>>() {
-            }.getType());
-            // 因为有的用户的标签列表可能为空，这会导致在用用户的标签列表去判断前端传入的标签列表中的标签时会报错空指针，如果需要给用户的标签列表进行一个非空设置
-            // 这段代码会先创建一个Optional对象，如果tmpTagNameListSet不为空，则包含tmpTagNameListSet，反之则包含null
-            // 如果Optional包含的是null，则会走orElse为Optional设置一个默认值，然后返回新的Set<String>实例
-            tmpTagNameListSet = Optional.ofNullable(tmpTagNameListSet).orElse(new HashSet<>());
-            // 遍历要查询的标签列表，然后判断该用户的标签列表是否包含该标签，如果不包含，直接返回false，也就不匹配该用户
-            for (String tagName : tagNameList) {
-                if (!tmpTagNameListSet.contains(tagName)) return false;
-            }
-            return true;
-        }).map(this::getSafetyUser).collect(Collectors.toList());
-        return userList;
     }
 
     /**
@@ -377,32 +334,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User user = this.getById(userId);
         if (user == null) throw new BusinessException(ErrorCode.SYSTEM_ERROR, "用户数据查询错误");
         // 获取用户所有的标签列表
-        QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
-        userTagQueryWrapper.eq("userId", userId);
-        List<UserTag> findUserTags = userTagService.list(userTagQueryWrapper);
-        // 标签信息处理：将标签信息脱敏
-        // 存储脱敏后的标签信息
-        List<UserTagVO> userTags = new ArrayList<>();
-        // 遍历用户自己有的标签关系数组
-        for (UserTag userTag :findUserTags) {
-            // 获取标签具体信息
-            Long tagId = userTag.getTagId();
-            Tag tag = tagService.getById(tagId);
-            // 信息脱敏
-            TagVO tagVO = new TagVO();
-            BeanUtils.copyProperties(tag, tagVO);
-            UserTagVO userTagVO = new UserTagVO();
-            userTagVO.setTag(tagVO);
-            userTagVO.setWeight(userTag.getWeight());
-            userTags.add(userTagVO);
-        }
+        List<TagVO> tagVOList = userTagService.getTagByUserId(userId);
         // 按照标签权重进行排序
-        userTags = userTags.stream().sorted(Comparator.comparingInt(UserTagVO::getWeight).reversed()).collect(Collectors.toList());
+        tagVOList = tagVOList.stream().sorted(Comparator.comparingInt(TagVO::getWeight).reversed()).collect(Collectors.toList());
         // 用户信息脱敏
         UserVO userVO = new UserVO();
         BeanUtils.copyProperties(user, userVO);
-        userVO.setUserTags(userTags);
+        userVO.setUserTags(tagVOList);
         return userVO;
+    }
+
+    /**
+     * 根据标签搜索用户
+     *
+     * @param tagIdList 标签id列表
+     * @return 拥有这些标签的用户
+     */
+    @Override
+    public List<UserVO> searchUserByTagIds(List<Integer> tagIdList) {
+        // 判断列表是否为空
+        if (CollectionUtils.isEmpty(tagIdList)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        // 查询关联关系，获取用户这些标签的用户
+        QueryWrapper<UserTag> userTagQueryWrapper = new QueryWrapper<>();
+        userTagQueryWrapper.in("tagId", tagIdList);
+        List<UserTag> userTags = userTagService.list(userTagQueryWrapper);
+        return userTags.stream().map(userTag -> {
+            // 获取用户id，查询用户信息
+            Long userId = userTag.getUserId();
+            // 用户信息
+            User user = userMapper.selectById(userId);
+            // 根据用户id查询用户身上所有的标签，返回脱敏的标签列表
+            List<TagVO> tagVOList = userTagService.getTagByUserId(userId);
+            // 信息脱敏
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            userVO.setUserTags(tagVOList);
+            return userVO;
+        }).collect(Collectors.toList());
     }
 
     /**

@@ -52,14 +52,6 @@ public interface UserService extends IService<User> {
 
 
     /**
-     * 根据标签列表查询用户
-     *
-     * @param tagNameList 标签列表
-     * @return
-     */
-    List<User> searchUserByTags(List<String> tagNameList);
-
-    /**
      * 判断是否为管理员
      *
      * @param request
@@ -118,4 +110,12 @@ public interface UserService extends IService<User> {
      * @return
      */
     UserVO getCurrentUser(HttpServletRequest request);
+
+    /**
+     * 根据标签搜索用户
+     *
+     * @param tagIdList 标签id列表
+     * @return 拥有这些标签的用户
+     */
+    List<UserVO> searchUserByTagIds(List<Integer> tagIdList);
 }

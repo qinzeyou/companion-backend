@@ -141,17 +141,16 @@ public class UserController {
         return ResultUtils.success(userPage);
     }
 
-
     /**
      * 根据标签搜索用户
      *
-     * @param tagNameList 标签列表
+     * @param tagIdList 标签id列表
      * @return
      */
-    @GetMapping("/search/tags")
-    public BaseResponse<List<User>> searchUserByTags(@RequestParam(required = false) List<String> tagNameList) {
-        if (CollectionUtils.isEmpty(tagNameList)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        List<User> userList = userService.searchUserByTags(tagNameList);
+    @GetMapping("/search/tagIds")
+    public BaseResponse<List<UserVO>> searchUserByTagIds(@RequestParam(required = false) List<Integer> tagIdList) {
+        if (CollectionUtils.isEmpty(tagIdList)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        List<UserVO> userList = userService.searchUserByTagIds(tagIdList);
         return ResultUtils.success(userList);
     }
 
