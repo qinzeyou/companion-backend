@@ -18,4 +18,8 @@ public interface SystemConstant {
      * 用户密码加密盐值
      */
     String SALT = "caiya";
+    /**
+     * Redis Key前缀
+     */
+    String PREFIX_REDIS_KEY = "companion:user:";
 }

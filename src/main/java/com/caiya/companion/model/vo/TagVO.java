@@ -2,6 +2,7 @@ package com.caiya.companion.model.vo;
 
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -10,7 +11,7 @@ import java.util.Date;
  * @create 2024-08-06 12:12
  */
 @Data
-public class TagVO {
+public class TagVO implements Serializable {
     /**
      * id
      */
@@ -22,7 +23,7 @@ public class TagVO {
     private String tagName;
 
     /**
-     * 权重，控制用户自身标签的显示顺序，权重越高，标签越靠前
+     * 权重，为用户标签关系表字段，控制用户自身标签的显示顺序，权重越高，标签越靠前
      */
     private Integer weight;
 

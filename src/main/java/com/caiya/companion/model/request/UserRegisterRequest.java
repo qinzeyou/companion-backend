@@ -13,5 +13,4 @@ import java.io.Serializable;
 public class UserRegisterRequest implements Serializable {
     private String userAccount;
     private String password;
-    private String checkPassword;
 }

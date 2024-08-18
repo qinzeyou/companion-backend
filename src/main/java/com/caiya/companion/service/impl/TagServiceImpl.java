@@ -13,6 +13,7 @@ import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.domain.UserTag;
 import com.caiya.companion.model.enums.TagStatusEnum;
+import com.caiya.companion.model.qo.TagSearchListQO;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
@@ -273,5 +274,34 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag>
         response.setCurrent(pageNum);
         response.setSize(tags.size());
         return response;
+    }
+
+    /**
+     * 条件查询标签，如果请求体为空，则默认查询全部
+     * @param tagSearchListQO 查询请求体
+     * @return 符合查询条件的标签数组
+     */
+    @Override
+    public List<TagVO> searchTagList(TagSearchListQO tagSearchListQO) {
+        // 查询条件
+        QueryWrapper<Tag> queryWrapper = new QueryWrapper<>();
+        // 只查询子标签
+        queryWrapper.eq("isParent", 0);
+        // 如果条件不为为空才拼接查询条件
+        if (tagSearchListQO != null && StringUtils.isNotEmpty(tagSearchListQO.getTagName())){
+            // and连接符，查询子标签且模糊查询传入的查询字符串
+            queryWrapper.and(qw -> qw.like("tagName", tagSearchListQO.getTagName()));
+        }
+        // 查询出的结果
+        List<Tag> list = tagMapper.selectList(queryWrapper);
+        // 处理数据，整理成结果集所需数据
+        List<TagVO> res = new ArrayList<>();
+        for (Tag tag : list) {
+            // 标签信息处理
+            TagVO tagVO = new TagVO();
+            BeanUtils.copyProperties(tag, tagVO);
+            res.add(tagVO);
+        }
+        return res;
     }
 }

@@ -1,7 +1,6 @@
 package com.caiya.companion.model.vo;
 
 import com.baomidou.mybatisplus.annotation.TableField;
-import com.caiya.companion.model.domain.UserTag;
 import lombok.Data;
 
 import java.io.Serializable;

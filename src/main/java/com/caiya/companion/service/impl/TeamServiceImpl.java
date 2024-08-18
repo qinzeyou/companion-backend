@@ -560,7 +560,7 @@ public class TeamServiceImpl extends ServiceImpl<TeamMapper, Team>
         // 获取分页队伍数据
         QueryWrapper<Team> queryWrapper = new QueryWrapper<>();
         // 不推荐已过期的队伍
-//        queryWrapper.nested(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
+        queryWrapper.nested(qw -> qw.gt("expireTime", new Date()).or().isNull("expireTime"));
         Page<Team> page = new Page<>(pageRequest.getPageNum(), pageRequest.getPageSize());
         Page<Team> teamPage = page(page, queryWrapper);
         List<Team> teamList = teamPage.getRecords();

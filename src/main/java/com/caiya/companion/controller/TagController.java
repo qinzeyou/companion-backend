@@ -3,6 +3,7 @@ package com.caiya.companion.controller;
 import com.caiya.companion.common.*;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.qo.TagSearchListQO;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
@@ -91,6 +92,17 @@ public class TagController {
     @PostMapping("/hot/page")
     private BaseResponse<PageResponse<List<TagVO>>> hotTagPage(@RequestBody PageRequest pageRequest, HttpServletRequest request) {
         PageResponse<List<TagVO>> res = tagService.hotTagPage(pageRequest, request);
+        return ResultUtils.success(res);
+    }
+
+    /**
+     * 条件查询标签，如果请求体为空，则默认查询全部
+     * @param tagSearchListQO 查询请求体
+     * @return 符合查询条件的标签数组
+     */
+    @PostMapping("/search/list")
+    private BaseResponse<List<TagVO>> searchTagList(@RequestBody TagSearchListQO tagSearchListQO) {
+        List<TagVO> res = tagService.searchTagList(tagSearchListQO);
         return ResultUtils.success(res);
     }
 }

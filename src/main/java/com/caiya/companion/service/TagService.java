@@ -5,6 +5,7 @@ import com.caiya.companion.common.PageRequest;
 import com.caiya.companion.common.PageResponse;
 import com.caiya.companion.model.domain.Tag;
 import com.caiya.companion.model.domain.User;
+import com.caiya.companion.model.qo.TagSearchListQO;
 import com.caiya.companion.model.request.TagAddRequest;
 import com.caiya.companion.model.request.TagUpdateRequest;
 import com.caiya.companion.model.vo.TagTreeVO;
@@ -57,4 +58,11 @@ public interface TagService extends IService<Tag> {
      * @return 热门标签分页数据
      */
     PageResponse<List<TagVO>> hotTagPage(PageRequest pageRequest, HttpServletRequest request);
+
+    /**
+     * 条件查询标签，如果请求体为空，则默认查询全部
+     * @param tagSearchListQO 查询请求体
+     * @return 符合查询条件的标签数组
+     */
+    List<TagVO> searchTagList(TagSearchListQO tagSearchListQO);
 }

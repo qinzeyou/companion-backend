@@ -19,9 +19,9 @@ spring:
     url: jdbc:mysql://localhost:3306/companion?serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
     username: root
     password: 123456
-    #    url: jdbc:mysql://47.121.29.243:3306/companion?serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
-    #    username: companion
-    #    password: 123456
+#    url: jdbc:mysql://47.121.29.243:3306/companion?serverTimezone=Asia/Shanghai&rewriteBatchedStatements=true
+#    username: companion
+#    password: 123456
     # 连接池
     hikari:
       minimum-idle: 5 # 最小空闲连接数

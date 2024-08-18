@@ -2,9 +2,7 @@ package com.caiya.companion.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.caiya.companion.common.BaseResponse;
-import com.caiya.companion.common.ErrorCode;
-import com.caiya.companion.common.ResultUtils;
+import com.caiya.companion.common.*;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.model.domain.User;
 import com.caiya.companion.model.request.UserLoginRequest;
@@ -13,6 +11,7 @@ import com.caiya.companion.model.vo.UserVO;
 import com.caiya.companion.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +19,8 @@ import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static com.caiya.companion.constant.UserConstant.USER_LOGIN_STATE;
 
 
 /**
@@ -46,10 +47,9 @@ public class UserController {
         if (userRegisterRequest == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
         String userAccount = userRegisterRequest.getUserAccount();
         String password = userRegisterRequest.getPassword();
-        String checkPassword = userRegisterRequest.getCheckPassword();
         // 判断参数是否为空
-        if (StringUtils.isAnyBlank(userAccount, password, checkPassword)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        Long result = userService.userRegister(userAccount, password, checkPassword);
+        if (StringUtils.isAnyBlank(userAccount, password)) throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        Long result = userService.userRegister(userAccount, password);
         return ResultUtils.success(result);
     }
 
@@ -111,24 +111,29 @@ public class UserController {
      * @return
      */
     @GetMapping("/recommend")
-    public BaseResponse<Page<User>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
-        Page<User> userPage = userService.recommendUsers(pageNum, pageSize, request);
+    public BaseResponse<PageResponse<List<UserVO>>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
+        PageResponse<List<UserVO>> userPage = userService.recommendUsers(pageNum, pageSize, request);
         return ResultUtils.success(userPage);
     }
 
     /**
      * 推荐匹配用户列表
      *
-     * @param num
-     * @param request
-     * @return
+     * @param num 匹配用户的数量
+     * @param request 登录信息
+     * @return 匹配的用户列表
      */
     @GetMapping("/match/{num}")
     public BaseResponse<List<UserVO>> matchUsers(@PathVariable Integer num, HttpServletRequest request) {
         if (num <= 0) {
             num = 10;
         }
-        List<UserVO> userPage = userService.matchUsers(num, request);
+        // 获取用户信息
+        UserVO loginUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
+        // 用户信息转换：在redis预热代码中也需要匹配用户，但是传入的参数是user，而不是脱敏的用户信息，所以为了减少重复代码，统一转换为user
+        User user = new User();
+        BeanUtils.copyProperties(loginUser, user);
+        List<UserVO> userPage = userService.matchUsers(num, user);
         return ResultUtils.success(userPage);
     }
 
@@ -177,5 +182,17 @@ public class UserController {
         if (user == null) throw new BusinessException(ErrorCode.PARAMS_ERROR);
         int result = userService.updateUser(user, request);
         return ResultUtils.success(result);
+    }
+
+    /**
+     * 根据用户id获取用户信息
+     * @param userId 用户id
+     * @return 用户信息
+     */
+    @GetMapping("/getUserInfo")
+    public BaseResponse<UserVO> getUserInfoById(@RequestParam Long userId) {
+        if (userId == null) throw new BusinessException(ErrorCode.NULL_ERROR, "用户id不能为空");
+        UserVO res = userService.getUserInfoById(userId);
+        return ResultUtils.success(res);
     }
 }

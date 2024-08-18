@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.caiya.companion.common.ErrorCode;
+import com.caiya.companion.common.PageRequest;
+import com.caiya.companion.common.PageResponse;
+import com.caiya.companion.constant.SystemConstant;
 import com.caiya.companion.constant.UserConstant;
 import com.caiya.companion.exception.BusinessException;
 import com.caiya.companion.mapper.UserMapper;
@@ -15,6 +18,8 @@ import com.caiya.companion.model.vo.UserVO;
 import com.caiya.companion.service.UserService;
 import com.caiya.companion.service.UserTagService;
 import com.caiya.companion.utils.AlgorithmUtils;
+import com.caiya.companion.utils.DataTransitionUtils;
+import com.caiya.companion.utils.UserUtils;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import javafx.util.Pair;
@@ -53,6 +58,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     @Resource
     private UserTagService userTagService;
     @Resource
+    private DataTransitionUtils dataTransitionUtils;
+    @Resource
     private UserTagMapper userTagMapper;
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
@@ -63,13 +70,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
     public static final String SALT = "caiya";
 
     @Override
-    public long userRegister(String userAccount, String password, String checkPassword) {
+    public long userRegister(String userAccount, String password) {
         // 1. 校验
-        if (StringUtils.isAnyBlank(userAccount, password, checkPassword))
+        if (StringUtils.isAnyBlank(userAccount, password))
             throw new BusinessException(ErrorCode.NULL_ERROR);
         // 校验长度
         if (userAccount.length() < 4) throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        if (password.length() < 8 || checkPassword.length() < 8) throw new BusinessException(ErrorCode.PARAMS_ERROR);
 
         // 账号字符特殊校验
         String validPattern = "[\\n`~!@#$%^&*()+=|{}':;',\\\\[\\\\].<>/?~！@#￥%……&*()——+|{}【】‘；：”“’。， 、？]";
@@ -88,6 +94,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         User user = new User();
         user.setUserAccount(userAccount);
         user.setPassword(encryptPassword);
+        // 设置默认值
+        // 默认头像
+        user.setAvatarUrl(UserConstant.DEFAULT_USER_AVATAR);
+        // 随机昵称
+        user.setUsername(UserConstant.RANDOM_USERNAME);
+        // 默认简介
+        user.setProfile(UserConstant.DEFAULT_USER_PROFILE);
         boolean saveResult = this.save(user);
         if (!saveResult) throw new BusinessException(ErrorCode.SYSTEM_ERROR);
 
@@ -114,7 +127,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         userQueryWrapper.eq("userAccount", userAccount);
         userQueryWrapper.eq("password", encryptPassword);
         User user = userMapper.selectOne(userQueryWrapper);
-        if (user == null) throw new BusinessException(ErrorCode.NULL_ERROR);
+        if (user == null) throw new BusinessException(ErrorCode.NULL_ERROR, "账号或密码错误");
 
         // 脱敏
         UserVO userVO = new UserVO();
@@ -248,49 +261,59 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
      * @return
      */
     @Override
-    public Page<User> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
-        UserVO loginUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
-        String redisKey = "companion:user:recommend:%s";
-        // 判断用户是否登录，如果登录则根据登录用户id来存取缓存
-        if (loginUser != null) {
-            redisKey = String.format(redisKey, loginUser.getId());
-        } else {
-            // 不登录则默认存取公共缓存
-            redisKey = String.format(redisKey, 0);
-        }
-        // 去读Redis缓存
-        ValueOperations<String, Object> opsForValue = redisTemplate.opsForValue();
-        Page<User> userPage = (Page<User>) opsForValue.get(redisKey);
-        // 如果redis中是有缓存，则直接读取缓存并返回
-        if (userPage != null) {
-            return userPage;
-        }
+    public PageResponse<List<UserVO>> recommendUsers(long pageNum, long pageSize, HttpServletRequest request) {
+//        UserVO loginUser = (UserVO) request.getSession().getAttribute(USER_LOGIN_STATE);
+//        String redisKey = SystemConstant.PREFIX_REDIS_KEY + "recommend:%s";
+//        // 判断用户是否登录，如果登录则根据登录用户id来存取缓存
+//        if (loginUser != null) {
+//            redisKey = String.format(redisKey, loginUser.getId());
+//        } else {
+//            // 不登录则默认存取公共缓存
+//            redisKey = String.format(redisKey, 0);
+//        }
+//        // 去读Redis缓存
+//        ValueOperations<String, Object> opsForValue = redisTemplate.opsForValue();
+//        PageResponse<List<UserVO>> userPage = (PageResponse<List<UserVO>>) opsForValue.get(redisKey);
+//        // 如果redis中是有缓存，则直接读取缓存并返回
+//        if (userPage != null) {
+//            return userPage;
+//        }
         // 如果没有缓存，则直接查询数据库，将结果存储到redis中，且返回结果
         QueryWrapper<User> queryWrapper = new QueryWrapper<>();
         Page<User> page = new Page<>(pageNum, pageSize);
-        userPage = this.page(page, queryWrapper);
+        Page<User> findUserPage = this.page(page, queryWrapper);
+        // 用户信息脱敏，且返回自定义分页封装结果
+        PageResponse<List<UserVO>> pageResponse = getListPageResponse(findUserPage);
+
         // 存入redis
-        try {
-            opsForValue.set(redisKey, userPage, 1, TimeUnit.DAYS);
-        } catch (Exception e) {
-            log.error("set redis key error：", e);
-        }
-        return userPage;
+//        try {
+//            opsForValue.set(redisKey, pageResponse, 1, TimeUnit.DAYS);
+//        } catch (Exception e) {
+//            log.error("set redis key error：", e);
+//        }
+        return pageResponse;
     }
 
     /**
      * 推荐匹配用户列表
      *
-     * @param num
-     * @param request
-     * @return
+     * @param num         匹配用户的数量
+     * @param currentUser 匹配用户
+     * @return 匹配的用户列表
      */
     @Override
-    public List<UserVO> matchUsers(Integer num, HttpServletRequest request) {
+    public List<UserVO> matchUsers(Integer num, User currentUser) {
+        // redisKey
+        String redisKey = SystemConstant.PREFIX_REDIS_KEY + "match:%s";
+        // 去读Redis缓存
+        ValueOperations<String, Object> opsForValue = redisTemplate.opsForValue();
+        List<UserVO> userPage = (List<UserVO>) opsForValue.get(redisKey);
+        // 如果redis中是有缓存，则直接读取缓存并返回
+        if (userPage != null) {
+            return userPage;
+        }
         // 获取所有用户信息
         List<User> originUserList = userMapper.selectList(new QueryWrapper<>());
-        // 获取登录用户信息作为推荐
-        User loginUser = getLoginUser(request);
         // 存储 拥有标签数据 的用户
         List<UserVO> userVOList = new ArrayList<>();
         // 处理用户数据，统一查询用户的标签，并设置到字段中
@@ -306,19 +329,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
 
         // 如果用户未登录，则随机取出用户
-        if (loginUser == null)
+        if (currentUser == null)
             return getRandomElements(userVOList, num);
         // 用户列表的下标 => 相似度
         List<Pair<UserVO, Long>> indexUserDistanceList = new ArrayList<>();
         // 当前登录用户所属的标签名称数组
-        List<String> loginUserTagNameList = userTagService.getTagByUserId(loginUser.getId()).stream().map(TagVO::getTagName).collect(Collectors.toList());
+        List<String> loginUserTagNameList = userTagService.getTagByUserId(currentUser.getId()).stream().map(TagVO::getTagName).collect(Collectors.toList());
         // 依次计算所有用户和当前用户的相似度
         for (UserVO matchUser : userVOList) {
             // 待匹配用户所属的标签名称数组
             List<String> matchUserTagNameList = matchUser.getUserTags().stream().map(TagVO::getTagName).collect(Collectors.toList());
 
             // 标签为空 || 剔除自己
-            if (CollectionUtils.isEmpty(matchUserTagNameList) || Objects.equals(matchUser.getId(), loginUser.getId()))
+            if (CollectionUtils.isEmpty(matchUserTagNameList) || Objects.equals(matchUser.getId(), currentUser.getId()))
                 continue;
             // 计算分数
             long distance = AlgorithmUtils.minDistance(loginUserTagNameList, matchUserTagNameList);
@@ -330,60 +353,37 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
                 .limit(num)
                 .collect(Collectors.toList());
         // 取出key：用户
-        return topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
+        List<UserVO> res = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
+        // 存入redis
+        try {
+            opsForValue.set(redisKey, res, 1, TimeUnit.DAYS);
+        } catch (Exception e) {
+            log.error("set redis key error：", e);
+        }
+        return res;
     }
 
-//    /**
-//     * 推荐匹配用户列表
-//     *
-//     * @param num
-//     * @param request
-//     * @return
-//     */
-//    @Override
-//    public List<User> matchUsers(Integer num, HttpServletRequest request) {
-//        // 获取所有用户信息
-//        QueryWrapper<User> userQueryWrapper = new QueryWrapper<>();
-//        userQueryWrapper.isNotNull("tags");
-//        // 原始用户数据列表
-//        List<User> originUserList = this.list(userQueryWrapper);
-//        // 获取登录用户信息作为推荐
-//        User loginUser = getLoginUser(request);
-//        // 1. 如果用户未登录，则随机取出用户
-//        if (loginUser == null) {
-//            return getRandomElements(originUserList, num);
-//        }
-//
-//        // 2. 如果用户已登录，则根据编辑距离算法进行推荐
-//        // 获取登录用户的标签
-//        String loginUserTags = loginUser.getTags();
-//        Gson gson = new Gson();
-//        // 将获取到标签转为java数组对象，因为从登录用户取出的是字符串类型的，需要转一下，方便后面操作
-//        List<String> loginUserTagList = gson.fromJson(loginUserTags, new TypeToken<List<String>>() {
-//        }.getType());
-//        // 用户列表的下标 => 相似度
-//        List<Pair<User, Long>> indexUserDistanceList = new ArrayList<>();
-//        // 依次计算所有用户和当前用户的相似度
-//        for (int i = 0; i < originUserList.size(); i++) {
-//            User user = originUserList.get(i);
-//            String userTags = user.getTags();
-//            List<String> userTagsList = gson.fromJson(userTags, new TypeToken<List<String>>() {
-//            }.getType());
-//            // 标签为空 || 剔除自己
-//            if (CollectionUtils.isEmpty(userTagsList) || Objects.equals(user.getId(), loginUser.getId())) continue;
-//            // 计算分数
-//            long distance = AlgorithmUtils.minDistance(loginUserTagList, userTagsList);
-//            indexUserDistanceList.add(new Pair<>(user, distance));
-//        }
-//        // 根据编辑距离排序，距离越小，用户相似度越高
-//        List<Pair<User, Long>> topUserPairList = indexUserDistanceList.stream()
-//                .sorted((a, b) -> (int) (a.getValue() - b.getValue()))
-//                .limit(num)
-//                .collect(Collectors.toList());
-//        // 取出key：用户
-//        List<User> result = topUserPairList.stream().map(Pair::getKey).collect(Collectors.toList());
-//        return result;
-//    }
+    /**
+     * 处理mybatis-plus分页，将用户脱敏，然后存储到自定义分页结果
+     *
+     * @param findUserPage 分页数据
+     * @return 自定义分页结果，存储脱敏后的用户数据
+     */
+    public PageResponse<List<UserVO>> getListPageResponse(Page<User> findUserPage) {
+        // 处理用户数据
+        List<UserVO> userVOList = findUserPage.getRecords().stream().map(user -> {
+            // 用户数据脱敏
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            // 获取用户所属标签
+            List<TagVO> tags = userTagService.getTagByUserId(userVO.getId());
+            userVO.setUserTags(tags);
+            return userVO;
+        }).collect(Collectors.toList());
+
+        // 返回封装结果
+        return dataTransitionUtils.pageResponse(findUserPage, userVOList);
+    }
 
     /**
      * 获取当前登录用户信息
@@ -446,6 +446,26 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         }
 
         return res;
+    }
+
+    /**
+     * 根据用户id获取用户信息
+     *
+     * @param userId 用户id
+     * @return 用户信息
+     */
+    @Override
+    public UserVO getUserInfoById(Long userId) {
+        User findUser = userMapper.selectById(userId);
+        // 用户数据为空报错
+        if (findUser == null) throw new BusinessException(ErrorCode.NULL_ERROR, "查询不到该用户");
+        // 用户数据脱敏
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(findUser, userVO);
+        // 获取用户标签信息
+        List<TagVO> tagVOList = userTagService.getTagByUserId(userId);
+        userVO.setUserTags(tagVOList);
+        return userVO;
     }
 
     /**
